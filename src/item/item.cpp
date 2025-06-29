@@ -77,6 +77,20 @@ OkItem::~OkItem() {
  * @brief Initialize OpenGL buffers for the item.
  */
 void OkItem::_initBuffers() {
+  // Delete existing OpenGL objects if they exist (safe for updates)
+  if (VAO != 0) {
+    glDeleteVertexArrays(1, &VAO);
+    VAO = 0;
+  }
+  if (VBO != 0) {
+    glDeleteBuffers(1, &VBO);
+    VBO = 0;
+  }
+  if (EBO != 0) {
+    glDeleteBuffers(1, &EBO);
+    EBO = 0;
+  }
+
   // Generate and bind VAO first
   glGenVertexArrays(1, &VAO);
   glBindVertexArray(VAO);
@@ -338,4 +352,37 @@ void OkItem::drawSelf() {
     // glBindTexture(GL_TEXTURE_2D, 0);
     OkTexture::unbind();
   }
+}
+
+/**
+ * @brief Update the vertex data of an existing item safely.
+ * @param newVertexData The new vertex data.
+ * @param newVertexCount The number of new vertices.
+ * @note This method updates the OpenGL buffers without recreating the item.
+ */
+void OkItem::updateVertexData(float *newVertexData, long newVertexCount) {
+  if (!newVertexData || newVertexCount <= 0) {
+    OkLogger::error("Item", "Invalid vertex data for update");
+    return;
+  }
+
+  OkLogger::info("Item", "Updating vertex data for " + name + " from " +
+                             std::to_string(numVertices) + " to " +
+                             std::to_string(newVertexCount) + " vertices");
+
+  // Free old vertex data
+  delete[] vertices;
+
+  // Allocate and copy new vertex data
+  vertices = new float[newVertexCount];
+  std::memcpy(vertices, newVertexData, newVertexCount * sizeof(float));
+  numVertices = newVertexCount;
+
+  // Recalculate radius with new geometry
+  _calculateRadius();
+
+  // Re-initialize OpenGL buffers with new data
+  _initBuffers();
+
+  OkLogger::info("Item", "Vertex data and OpenGL buffers updated successfully");
 }

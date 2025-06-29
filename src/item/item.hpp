@@ -49,6 +49,7 @@ public:
 
   // Geometry
   float getRadius() const { return radius; }
+  void  updateVertexData(float *newVertexData, long newVertexCount);
 
   // Texture methods
   void loadTextureFromFile(const std::string &texturePath);
