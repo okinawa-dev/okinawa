@@ -4,7 +4,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
-#include "../src/math/point.hpp"
+#include "okinawa/math/point.hpp"
 
 TEST_CASE("OkPoint basic operations", "[point]") {
   SECTION("Default constructor creates zero vector") {

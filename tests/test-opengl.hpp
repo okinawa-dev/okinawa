@@ -1,7 +1,7 @@
 #ifndef TEST_OPENGL_HPP
 #define TEST_OPENGL_HPP
 
-#include "../src/core/gl_config.hpp"
+#include "okinawa/core/gl_config.hpp"
 #include <GLFW/glfw3.h>
 #include <stdexcept>
 

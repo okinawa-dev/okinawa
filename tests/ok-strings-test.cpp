@@ -1,4 +1,4 @@
-#include "../src/utils/strings.hpp"
+#include "okinawa/utils/strings.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
 

@@ -35,10 +35,13 @@ add_requires("catch2")              -- only used by the test target
 target("okinawa")
     set_kind("static")
     add_files("src/**.cpp")
-    -- Public include root: the engine and its consumers use it as the base
-    -- for header paths. (Consumer "okinawa/..." prefix is handled when the
-    -- consumers are migrated; the engine itself uses relative includes.)
-    add_includedirs("src", {public = true})
+    -- Headers live under src/okinawa/, so consumers include them with the
+    -- "okinawa/" prefix (e.g. #include "okinawa/core/core.hpp") via the
+    -- public "src" root. The private "src/okinawa" root lets the engine's
+    -- own sources keep their internal, unprefixed includes (e.g.
+    -- #include "math/point.hpp").
+    add_includedirs("src/okinawa")             -- private: engine-internal includes
+    add_includedirs("src", {public = true})    -- public: consumers use okinawa/ prefix
     add_packages("glm", "glfw", "stb", "opengl", {public = true})
 
     -- macOS windowing/runtime frameworks required by GLFW.

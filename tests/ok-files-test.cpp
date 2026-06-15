@@ -1,4 +1,4 @@
-#include "../src/utils/files.hpp"
+#include "okinawa/utils/files.hpp"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>

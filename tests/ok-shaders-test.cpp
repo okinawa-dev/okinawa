@@ -1,6 +1,6 @@
 
-#include "../src/core/gl_config.hpp"
-#include "../src/shaders/shaders.hpp"
+#include "okinawa/core/gl_config.hpp"
+#include "okinawa/shaders/shaders.hpp"
 #include <catch2/catch_test_macros.hpp>
 
 #include "test-opengl.hpp"

@@ -1,6 +1,6 @@
 // NOLINTBEGIN(readability-magic-numbers)
 
-#include "../src/utils/logger.hpp"
+#include "okinawa/utils/logger.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <iostream>
 #include <sstream>
