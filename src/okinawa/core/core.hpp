@@ -8,6 +8,10 @@
 #include <functional>
 #include <vector>
 
+// Forward declaration: the MCP server type is only a pointer here, and its
+// full definition (and dependencies) stays out of this public header.
+class OkMcpServer;
+
 /**
  * @brief Core class for the Okinawa engine.
  *        It handles the initialization of OpenGL, shaders, and the main loop.
@@ -40,6 +44,13 @@ public:
   static void addCamera(OkCamera *camera);
   static void switchCamera(int index);
 
+  // Enable the in-engine MCP server so an external agent can connect over
+  // local HTTP and drive the app (v1: capture the rendered frame). Binds
+  // 127.0.0.1:port. This symbol always exists; if the engine was built
+  // without MCP support (OKINAWA_WITH_MCP undefined) it logs a warning and
+  // does nothing, so apps compile identically with or without the server.
+  static void enableMcpServer(int port = 8765);
+
 private:
   static bool initializeOpenGL(int width, int height);
   static bool initializeShaders();
@@ -50,6 +61,7 @@ private:
   static OkSceneHandler         *_sceneHandler;
   static GLuint                  _shaderProgram;
   static OkInput                *_input;
+  static OkMcpServer            *_mcpServer;
 
   static void mouseCallback(GLFWwindow *window, double xpos, double ypos);
 };

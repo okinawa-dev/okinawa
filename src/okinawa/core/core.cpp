@@ -9,6 +9,9 @@
 #include "handlers/scenes.hpp"
 #include "math/rotation.hpp"
 #include "scene/scene.hpp"
+#ifdef OKINAWA_WITH_MCP
+#include "../mcp/mcp-server.hpp"
+#endif
 #include <algorithm>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -23,6 +26,29 @@ int                     OkCore::_currentCamera = 0;
 OkSceneHandler         *OkCore::_sceneHandler  = nullptr;
 GLuint                  OkCore::_shaderProgram = 0;
 OkInput                *OkCore::_input         = nullptr;
+OkMcpServer            *OkCore::_mcpServer     = nullptr;
+
+/**
+ * @brief Enable the in-engine MCP server so an external agent can connect
+ *        over local HTTP and drive the app. See core.hpp for the contract.
+ * @param port TCP port to bind on 127.0.0.1.
+ */
+void OkCore::enableMcpServer(int port) {
+#ifdef OKINAWA_WITH_MCP
+  if (_mcpServer != nullptr) {
+    OkLogger::warning("MCP", "MCP server already enabled");
+    return;
+  }
+  _mcpServer = new OkMcpServer(port);
+  _mcpServer->start();
+  OkLogger::info("MCP", "MCP server listening on http://127.0.0.1:" +
+                            std::to_string(port) + "/mcp");
+#else
+  (void)port;
+  OkLogger::warning(
+      "MCP", "MCP server not compiled into this build (rebuild with --mcp=y)");
+#endif
+}
 
 /**
  * @brief Initialize the core engine.
@@ -264,6 +290,15 @@ void OkCore::loop(const OkCoreCallback &stepCallback,
       for (int i = 0; i < _cameras.size(); ++i) {
         _cameras[i]->draw();
       }
+
+#ifdef OKINAWA_WITH_MCP
+      // Run any queued MCP tool commands on this (GL) thread, after the frame
+      // is rendered and before the buffers are swapped, so a capture reads the
+      // freshly drawn back buffer.
+      if (_mcpServer != nullptr) {
+        _mcpServer->drainCommands();
+      }
+#endif
 
       glfwSwapBuffers(_window);
       glfwPollEvents();
