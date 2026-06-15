@@ -3,7 +3,19 @@
 #include "okinawa/config/config.hpp"
 #include <catch2/catch_test_macros.hpp>
 
-TEST_CASE("OkConfig initialization and default values", "[config]") {
+// OkConfig is a global singleton; its values persist across test cases. The
+// fixture resets it to defaults before each case so the tests are isolated
+// and independent of the (randomised) execution order.
+namespace {
+struct ConfigTestFixture {
+  ConfigTestFixture() {
+    OkConfig::reset();
+  }
+};
+}  // namespace
+
+TEST_CASE_METHOD(ConfigTestFixture,
+                 "OkConfig initialization and default values", "[config]") {
   SECTION("Default graphics settings") {
     REQUIRE_FALSE(OkConfig::getBool("graphics.wireframe"));
     REQUIRE(OkConfig::getBool("graphics.textures"));
@@ -26,7 +38,7 @@ TEST_CASE("OkConfig initialization and default values", "[config]") {
   }
 }
 
-TEST_CASE("OkConfig value modifications", "[config]") {
+TEST_CASE_METHOD(ConfigTestFixture, "OkConfig value modifications", "[config]") {
   SECTION("Modify integer values") {
     OkConfig::setInt("window.width", 1024);
     REQUIRE(OkConfig::getInt("window.width") == 1024);
@@ -49,7 +61,7 @@ TEST_CASE("OkConfig value modifications", "[config]") {
   }
 }
 
-TEST_CASE("OkConfig error handling", "[config]") {
+TEST_CASE_METHOD(ConfigTestFixture, "OkConfig error handling", "[config]") {
   SECTION("Non-existent keys") {
     REQUIRE(OkConfig::getInt("nonexistent.int") == 0);
     REQUIRE(OkConfig::getFloat("nonexistent.float") == 0.0f);

@@ -8,6 +8,13 @@
  *       The constructor is private to enforce singleton pattern.
  */
 OkConfig::OkConfig() {
+  setDefaults();
+}
+
+/**
+ * @brief Populate the configuration with its default values.
+ */
+void OkConfig::setDefaults() {
   // NOLINTBEGIN(readability-magic-numbers)
   // Graphics settings
   boolValues["graphics.wireframe"]   = false;
@@ -28,6 +35,19 @@ OkConfig::OkConfig() {
   float timePerFrame = 1000.0f / 60.0f;  // Using hardcoded FPS value
   floatValues["graphics.time-per-frame"] = timePerFrame;
   // NOLINTEND(readability-magic-numbers)
+}
+
+/**
+ * @brief Reset the configuration back to its default values.
+ *        Clears any values set at runtime (or by tests) and re-applies the
+ *        defaults, so callers start from a known, clean state.
+ */
+void OkConfig::reset() {
+  OkConfig &config = getConfig();
+  config.intValues.clear();
+  config.floatValues.clear();
+  config.boolValues.clear();
+  config.setDefaults();
 }
 
 /**
