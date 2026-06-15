@@ -22,6 +22,7 @@ OkInput::OkInput(GLFWwindow *window, MouseCallback callback) {
   // Initialize key arrays
   std::memset(_currentKeys, 0, sizeof(_currentKeys));
   std::memset(_prevKeys, 0, sizeof(_prevKeys));
+  std::memset(_injectedUntil, 0, sizeof(_injectedUntil));
 
   OkLogger::info("Input", "Setting mouse callback...");
   glfwSetCursorPosCallback(window, _mouseCallback);
@@ -40,15 +41,17 @@ void OkInput::process() {
   std::memcpy(_prevKeys, _currentKeys, sizeof(_currentKeys));
   _prevState = _currentState;
 
-  // Update current key states - convert from GLFW to OkKeys
+  // Update current key states - convert from GLFW to OkKeys, OR-ing in any
+  // synthetic (injected) key that is still within its hold window so it
+  // behaves exactly like a physically held key.
+  double now = glfwGetTime();
   for (int i = 0; i < OK_KEY_COUNT; i++) {
-    OkKey okKey   = static_cast<OkKey>(i);
-    int   glfwKey = OkKeys::okKeyToGLFW(okKey);
-    if (glfwKey != GLFW_KEY_UNKNOWN) {
-      _currentKeys[i] = glfwGetKey(_window, glfwKey) == GLFW_PRESS;
-    } else {
-      _currentKeys[i] = false;
-    }
+    OkKey okKey    = static_cast<OkKey>(i);
+    int   glfwKey  = OkKeys::okKeyToGLFW(okKey);
+    bool  physical = glfwKey != GLFW_KEY_UNKNOWN &&
+                    glfwGetKey(_window, glfwKey) == GLFW_PRESS;
+    bool injected   = now < _injectedUntil[i];
+    _currentKeys[i] = physical || injected;
   }
 
   // Update movement state (continuous press) - using OkKeys directly
@@ -126,4 +129,20 @@ bool OkInput::isKeyJustReleased(OkKey key) const {
  */
 OkInputState OkInput::getState() const {
   return _currentState;
+}
+
+/**
+ * @brief Mark a key as synthetically held for the next durationSeconds.
+ * @param key             The key to inject.
+ * @param durationSeconds How long the key should read as pressed.
+ */
+void OkInput::injectKey(OkKey key, double durationSeconds) {
+  if (key <= OK_KEY_UNKNOWN || key >= OK_KEY_COUNT) {
+    return;
+  }
+  double until = glfwGetTime() + durationSeconds;
+  // Extend, never shorten, an existing injection window for this key.
+  if (until > _injectedUntil[key]) {
+    _injectedUntil[key] = until;
+  }
 }

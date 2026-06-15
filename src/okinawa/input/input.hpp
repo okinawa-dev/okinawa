@@ -66,6 +66,13 @@ public:
   // Get complete input state (for compatibility)
   OkInputState getState() const;
 
+  // Synthetic input: mark a key as held for the next durationSeconds, as if
+  // it were physically pressed. Used to drive the app programmatically (e.g.
+  // from the MCP server). The injected state is OR-ed into the polled state
+  // in process(), so it behaves exactly like a real key, including the
+  // edge-triggered actions. Call from the engine loop thread.
+  void injectKey(OkKey key, double durationSeconds);
+
   // Constants
   static constexpr float MOVE_SPEED     = 5.0f;
   static constexpr float ROTATION_SPEED = 2.0f;
@@ -77,6 +84,9 @@ private:
   OkInputState  _prevState;                  // Previous frame's input state
   bool          _currentKeys[OK_KEY_COUNT];  // Current key states
   bool          _prevKeys[OK_KEY_COUNT];     // Previous key states
+  // Per-key "injected until" timestamps (glfwGetTime seconds). A key counts as
+  // pressed while glfwGetTime() < _injectedUntil[key].
+  double        _injectedUntil[OK_KEY_COUNT];
 };
 
 #endif

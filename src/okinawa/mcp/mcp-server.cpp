@@ -5,7 +5,12 @@
 
 #include "mcp-server.hpp"
 
-#include "../core/core.hpp"  // OkCore::getWindow + OpenGL / GLFW headers
+#include "../core/core.hpp"  // OkCore + OpenGL / GLFW headers
+#include "../input/input.hpp"
+#include "../input/keys.hpp"
+#include "../math/point.hpp"
+#include "../math/rotation.hpp"
+#include "../scene/scene.hpp"
 #include "../utils/logger.hpp"
 
 #include <httplib.h>
@@ -17,9 +22,11 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
+#include <cctype>
 #include <chrono>
 #include <cstring>
 #include <deque>
+#include <fstream>
 #include <functional>
 #include <future>
 #include <memory>
@@ -28,14 +35,28 @@
 #include <thread>
 #include <vector>
 
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#endif
+
 using nlohmann::json;
 
-// ---------------------------------------------------------------------------
-// Small helpers
-// ---------------------------------------------------------------------------
+namespace {
+
+const double      kPi              = 3.14159265358979323846;
+const char *const kProtocolVersion = "2024-11-05";
+const char *const kServerName      = "okinawa";
+const char *const kServerVersion   = "0.1.0";
+
+double radToDeg(double r) {
+  return r * 180.0 / kPi;
+}
+double degToRad(double d) {
+  return d * kPi / 180.0;
+}
 
 // Standard base64 encoder (no external dependency).
-static std::string base64Encode(const std::vector<unsigned char> &data) {
+std::string base64Encode(const std::vector<unsigned char> &data) {
   static const char table[] =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   std::string out;
@@ -50,7 +71,6 @@ static std::string base64Encode(const std::vector<unsigned char> &data) {
     out.push_back(table[n & 0x3F]);
     i += 3;
   }
-
   size_t remaining = data.size() - i;
   if (remaining == 1) {
     unsigned int n = data[i] << 16;
@@ -68,22 +88,100 @@ static std::string base64Encode(const std::vector<unsigned char> &data) {
   return out;
 }
 
-// stb_image_write callback that appends encoded bytes to a vector.
-static void stbWriteToVector(void *context, void *data, int size) {
+void stbWriteToVector(void *context, void *data, int size) {
   std::vector<unsigned char> *out =
       static_cast<std::vector<unsigned char> *>(context);
   unsigned char *bytes = static_cast<unsigned char *>(data);
   out->insert(out->end(), bytes, bytes + size);
 }
 
-// Result of a framebuffer capture (filled on the GL thread).
-struct CaptureResult {
-  bool        ok = false;
-  std::string error;
-  std::string base64Png;
-  int         width  = 0;
-  int         height = 0;
-};
+// Map a key name (e.g. "W", "space", "1", "up") to an OkKey.
+OkKey okKeyFromName(const std::string &name) {
+  if (name.empty()) {
+    return OK_KEY_UNKNOWN;
+  }
+  std::string s;
+  for (size_t i = 0; i < name.size(); i++) {
+    s += static_cast<char>(std::toupper(static_cast<unsigned char>(name[i])));
+  }
+  if (s.size() == 1) {
+    char c = s[0];
+    if (c >= 'A' && c <= 'Z') {
+      return static_cast<OkKey>(OK_KEY_A + (c - 'A'));
+    }
+    if (c >= '0' && c <= '9') {
+      return static_cast<OkKey>(OK_KEY_0 + (c - '0'));
+    }
+  }
+  if (s == "SPACE")
+    return OK_KEY_SPACE;
+  if (s == "UP")
+    return OK_KEY_UP;
+  if (s == "DOWN")
+    return OK_KEY_DOWN;
+  if (s == "LEFT")
+    return OK_KEY_LEFT;
+  if (s == "RIGHT")
+    return OK_KEY_RIGHT;
+  if (s == "ESCAPE" || s == "ESC")
+    return OK_KEY_ESCAPE;
+  if (s == "ENTER" || s == "RETURN")
+    return OK_KEY_ENTER;
+  if (s == "TAB")
+    return OK_KEY_TAB;
+  return OK_KEY_UNKNOWN;
+}
+
+// Resident set size in MB (macOS), or -1 if unavailable.
+double residentMb() {
+#if defined(__APPLE__)
+  mach_task_basic_info_data_t info;
+  mach_msg_type_number_t      count = MACH_TASK_BASIC_INFO_COUNT;
+  if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+                reinterpret_cast<task_info_t>(&info), &count) == KERN_SUCCESS) {
+    return static_cast<double>(info.resident_size) / (1024.0 * 1024.0);
+  }
+#endif
+  return -1.0;
+}
+
+// Read the active camera's pose. MUST be called on the engine loop thread.
+json cameraPoseJson() {
+  json      p;
+  OkCamera *cam = OkCore::getCamera();
+  if (cam == nullptr) {
+    p["error"] = "no active camera";
+    return p;
+  }
+  OkPoint    pos = cam->getPosition();
+  OkRotation rot = cam->getRotation();
+  p["camera_index"]  = OkCore::getCurrentCameraIndex();
+  p["position"]      = {{"x", pos.x()}, {"y", pos.y()}, {"z", pos.z()}};
+  p["rotation_deg"]  = {{"pitch", radToDeg(rot.getPitch())},
+                        {"yaw", radToDeg(rot.getYaw())},
+                        {"roll", radToDeg(rot.getRoll())}};
+  return p;
+}
+
+// MCP tool-result builders.
+json textContent(const std::string &t) {
+  return json{{"type", "text"}, {"text", t}};
+}
+json textResult(const std::string &t) {
+  return json{{"content", json::array({textContent(t)})}, {"isError", false}};
+}
+json errorResult(const std::string &t) {
+  return json{{"content", json::array({textContent(t)})}, {"isError", true}};
+}
+json imageResult(const std::string &base64Png) {
+  json image;
+  image["type"]     = "image";
+  image["data"]     = base64Png;
+  image["mimeType"] = "image/png";
+  return json{{"content", json::array({image})}, {"isError", false}};
+}
+
+}  // namespace
 
 // ---------------------------------------------------------------------------
 // Impl
@@ -96,85 +194,280 @@ struct OkMcpServer::Impl {
   std::mutex                        queueMutex;
   std::deque<std::function<void()>> queue;
 
-  // Enqueue work to run on the engine loop thread (via drainCommands).
-  void enqueue(const std::function<void()> &fn) {
-    std::lock_guard<std::mutex> lock(queueMutex);
-    queue.push_back(fn);
+  // Measured frame rate, updated each frame in drainCommands.
+  double lastFrameTime = 0.0;
+  double fps           = 0.0;
+
+  // Run fn on the engine loop thread (where the GL context lives) and return
+  // its JSON result. Blocks the calling (HTTP) thread until the next frame
+  // executes the work, or times out.
+  json runOnLoop(const std::function<json()> &fn) {
+    std::shared_ptr<std::promise<json>> promise =
+        std::make_shared<std::promise<json>>();
+    std::future<json> future = promise->get_future();
+    {
+      std::lock_guard<std::mutex> lock(queueMutex);
+      queue.push_back([promise, fn]() {
+        json result;
+        try {
+          result = fn();
+        } catch (...) {
+          result          = json::object();
+          result["error"] = "exception on loop thread";
+        }
+        promise->set_value(result);
+      });
+    }
+    if (future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
+      json r;
+      r["error"] = "timed out (is the app rendering?)";
+      return r;
+    }
+    return future.get();
   }
 
-  // Capture the current framebuffer as a base64 PNG. Called from an HTTP
-  // worker thread; the actual GL work is marshalled onto the loop thread.
-  CaptureResult captureFrame() {
-    std::shared_ptr<std::promise<CaptureResult>> promise =
-        std::make_shared<std::promise<CaptureResult>>();
-    std::future<CaptureResult> future = promise->get_future();
-
-    enqueue([promise]() {
-      CaptureResult result;
-      GLFWwindow   *window = OkCore::getWindow();
+  // Capture the current framebuffer into a PNG byte buffer (on the loop
+  // thread). Returns true on success and fills width/height.
+  bool capturePng(std::shared_ptr<std::vector<unsigned char>> outPng,
+                  int &widthOut, int &heightOut) {
+    std::shared_ptr<std::pair<int, int>> wh =
+        std::make_shared<std::pair<int, int>>(0, 0);
+    json meta = runOnLoop([outPng, wh]() -> json {
+      GLFWwindow *window = OkCore::getWindow();
       if (window == nullptr) {
-        result.error = "no window";
-        promise->set_value(result);
-        return;
+        return json{{"ok", false}};
       }
-
       int width  = 0;
       int height = 0;
       glfwGetFramebufferSize(window, &width, &height);
       if (width <= 0 || height <= 0) {
-        result.error = "invalid framebuffer size";
-        promise->set_value(result);
-        return;
+        return json{{"ok", false}};
       }
-
       int                        stride = width * 4;
       std::vector<unsigned char> pixels(static_cast<size_t>(stride) * height);
       glPixelStorei(GL_PACK_ALIGNMENT, 1);
       glReadBuffer(GL_BACK);
       glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE,
                    pixels.data());
-
-      // OpenGL's origin is bottom-left; PNG expects top-left, so flip rows.
+      // OpenGL origin is bottom-left; PNG expects top-left, so flip rows.
       std::vector<unsigned char> flipped(static_cast<size_t>(stride) * height);
       for (int y = 0; y < height; y++) {
         memcpy(&flipped[static_cast<size_t>(stride) * (height - 1 - y)],
                &pixels[static_cast<size_t>(stride) * y], stride);
       }
-
-      std::vector<unsigned char> png;
-      int rc = stbi_write_png_to_func(stbWriteToVector, &png, width, height, 4,
-                                      flipped.data(), stride);
-      if (rc == 0 || png.empty()) {
-        result.error = "png encoding failed";
-        promise->set_value(result);
-        return;
+      outPng->clear();
+      int rc = stbi_write_png_to_func(stbWriteToVector, outPng.get(), width,
+                                      height, 4, flipped.data(), stride);
+      if (rc == 0 || outPng->empty()) {
+        return json{{"ok", false}};
       }
-
-      result.ok        = true;
-      result.base64Png = base64Encode(png);
-      result.width     = width;
-      result.height    = height;
-      promise->set_value(result);
+      wh->first  = width;
+      wh->second = height;
+      return json{{"ok", true}};
     });
+    widthOut  = wh->first;
+    heightOut = wh->second;
+    return meta.value("ok", false);
+  }
 
-    if (future.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
-      CaptureResult result;
-      result.error = "capture timed out (is the app rendering?)";
-      return result;
+  // The catalogue of tools, for tools/list.
+  json toolList() {
+    json tools = json::array();
+
+    json viewFrame;
+    viewFrame["name"]                          = "view_frame";
+    viewFrame["description"]                   = "Capture the current rendered frame and return it as a PNG image, so the agent can visually inspect what is on screen.";
+    viewFrame["inputSchema"]                   = {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}};
+    tools.push_back(viewFrame);
+
+    json screenshot;
+    screenshot["name"]        = "screenshot";
+    screenshot["description"] = "Capture the current frame and write it to a PNG file on disk (for a human to open). Returns the file path.";
+    screenshot["inputSchema"] = {{"type", "object"}, {"properties", {{"path", {{"type", "string"}, {"description", "Output file path (default: okinawa-screenshot.png in the working dir)."}}}}}, {"additionalProperties", false}};
+    tools.push_back(screenshot);
+
+    json pressKey;
+    pressKey["name"]        = "press_key";
+    pressKey["description"] = "Hold a key for a duration (movement integrates over frames). W/A/S/D move, SPACE/T/R/F are actions, 1-9 switch camera, arrows turn. Returns the resulting camera pose.";
+    pressKey["inputSchema"] = {{"type", "object"}, {"properties", {{"key", {{"type", "string"}, {"description", "Key name, e.g. W, A, S, D, SPACE, R, 1, UP."}}}, {"duration_ms", {{"type", "number"}, {"description", "How long to hold the key (default 120)."}}}}}, {"required", json::array({"key"})}, {"additionalProperties", false}};
+    tools.push_back(pressKey);
+
+    json pressKeys;
+    pressKeys["name"]        = "press_keys";
+    pressKeys["description"] = "Hold several keys at once for a duration (e.g. W and D for diagonal movement). Returns the resulting camera pose.";
+    pressKeys["inputSchema"] = {{"type", "object"}, {"properties", {{"keys", {{"type", "array"}, {"items", {{"type", "string"}}}}}, {"duration_ms", {{"type", "number"}}}}}, {"required", json::array({"keys"})}, {"additionalProperties", false}};
+    tools.push_back(pressKeys);
+
+    json look;
+    look["name"]        = "look";
+    look["description"] = "Rotate the active camera by the given deltas in degrees (the look / move-mouse equivalent). Returns the resulting camera pose.";
+    look["inputSchema"] = {{"type", "object"}, {"properties", {{"yaw_deg", {{"type", "number"}}}, {"pitch_deg", {{"type", "number"}}}}}, {"additionalProperties", false}};
+    tools.push_back(look);
+
+    json setPose;
+    setPose["name"]        = "set_camera_pose";
+    setPose["description"] = "Teleport/orient the active camera directly. Any omitted field keeps its current value. Useful to jump to inspect a specific spot. Returns the resulting camera pose.";
+    setPose["inputSchema"] = {{"type", "object"}, {"properties", {{"x", {{"type", "number"}}}, {"y", {{"type", "number"}}}, {"z", {{"type", "number"}}}, {"pitch_deg", {{"type", "number"}}}, {"yaw_deg", {{"type", "number"}}}, {"roll_deg", {{"type", "number"}}}}}, {"additionalProperties", false}};
+    tools.push_back(setPose);
+
+    json getState;
+    getState["name"]        = "get_state";
+    getState["description"] = "Return numeric runtime state: active camera pose, fps, scene object count, window size and resident memory.";
+    getState["inputSchema"] = {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}};
+    tools.push_back(getState);
+
+    return tools;
+  }
+
+  // Dispatch a tools/call by name. Returns the MCP result object.
+  json callTool(const std::string &name, const json &args) {
+    if (name == "view_frame") {
+      std::shared_ptr<std::vector<unsigned char>> png =
+          std::make_shared<std::vector<unsigned char>>();
+      int w = 0;
+      int h = 0;
+      if (!capturePng(png, w, h)) {
+        return errorResult("view_frame: capture failed");
+      }
+      return imageResult(base64Encode(*png));
     }
-    return future.get();
+
+    if (name == "screenshot") {
+      std::string path = args.value("path", std::string("okinawa-screenshot.png"));
+      std::shared_ptr<std::vector<unsigned char>> png =
+          std::make_shared<std::vector<unsigned char>>();
+      int w = 0;
+      int h = 0;
+      if (!capturePng(png, w, h)) {
+        return errorResult("screenshot: capture failed");
+      }
+      std::ofstream out(path.c_str(), std::ios::binary);
+      if (!out) {
+        return errorResult("screenshot: cannot open file: " + path);
+      }
+      out.write(reinterpret_cast<const char *>(png->data()),
+                static_cast<std::streamsize>(png->size()));
+      out.close();
+      return textResult("wrote " + std::to_string(png->size()) + " bytes (" +
+                        std::to_string(w) + "x" + std::to_string(h) +
+                        ") to " + path);
+    }
+
+    if (name == "press_key" || name == "press_keys") {
+      std::vector<OkKey>       keys;
+      std::vector<std::string> names;
+      if (name == "press_key") {
+        std::string k = args.value("key", std::string());
+        names.push_back(k);
+        keys.push_back(okKeyFromName(k));
+      } else if (args.contains("keys") && args["keys"].is_array()) {
+        for (size_t i = 0; i < args["keys"].size(); i++) {
+          std::string k = args["keys"][i].get<std::string>();
+          names.push_back(k);
+          keys.push_back(okKeyFromName(k));
+        }
+      }
+      for (size_t i = 0; i < keys.size(); i++) {
+        if (keys[i] == OK_KEY_UNKNOWN) {
+          return errorResult("unknown key: " + names[i]);
+        }
+      }
+      double durationMs = args.value("duration_ms", 120.0);
+      double seconds    = durationMs / 1000.0;
+      runOnLoop([keys, seconds]() -> json {
+        OkInput *input = OkCore::getInput();
+        for (size_t i = 0; i < keys.size(); i++) {
+          input->injectKey(keys[i], seconds);
+        }
+        return json::object();
+      });
+      // Let the loop apply the held keys over its frames, then read the pose.
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds(static_cast<long>(durationMs) + 40));
+      json pose = runOnLoop([]() -> json { return cameraPoseJson(); });
+      return textResult("held keys for " +
+                        std::to_string(static_cast<long>(durationMs)) +
+                        "ms\n" + pose.dump(2));
+    }
+
+    if (name == "look") {
+      double dyaw   = args.value("yaw_deg", 0.0);
+      double dpitch = args.value("pitch_deg", 0.0);
+      json   pose   = runOnLoop([dyaw, dpitch]() -> json {
+        OkCamera *cam = OkCore::getCamera();
+        if (cam == nullptr) {
+          return json{{"error", "no active camera"}};
+        }
+        OkRotation rot   = cam->getRotation();
+        float      pitch = static_cast<float>(rot.getPitch() + degToRad(dpitch));
+        float      yaw   = static_cast<float>(rot.getYaw() + degToRad(dyaw));
+        cam->setRotation(pitch, yaw, rot.getRoll());
+        return cameraPoseJson();
+      });
+      return textResult(pose.dump(2));
+    }
+
+    if (name == "set_camera_pose") {
+      json pose = runOnLoop([args]() -> json {
+        OkCamera *cam = OkCore::getCamera();
+        if (cam == nullptr) {
+          return json{{"error", "no active camera"}};
+        }
+        OkPoint pos = cam->getPosition();
+        float   x   = static_cast<float>(args.value("x", static_cast<double>(pos.x())));
+        float   y   = static_cast<float>(args.value("y", static_cast<double>(pos.y())));
+        float   z   = static_cast<float>(args.value("z", static_cast<double>(pos.z())));
+        cam->setPosition(x, y, z);
+
+        OkRotation rot   = cam->getRotation();
+        float      pitch = args.contains("pitch_deg")
+                               ? static_cast<float>(degToRad(args["pitch_deg"].get<double>()))
+                               : rot.getPitch();
+        float yaw        = args.contains("yaw_deg")
+                               ? static_cast<float>(degToRad(args["yaw_deg"].get<double>()))
+                               : rot.getYaw();
+        float roll       = args.contains("roll_deg")
+                               ? static_cast<float>(degToRad(args["roll_deg"].get<double>()))
+                               : rot.getRoll();
+        cam->setRotation(pitch, yaw, roll);
+        return cameraPoseJson();
+      });
+      return textResult(pose.dump(2));
+    }
+
+    if (name == "get_state") {
+      double measuredFps = fps;
+      json   state       = runOnLoop([measuredFps]() -> json {
+        json s = cameraPoseJson();
+
+        GLFWwindow *window = OkCore::getWindow();
+        int         w      = 0;
+        int         h      = 0;
+        if (window != nullptr) {
+          glfwGetFramebufferSize(window, &w, &h);
+        }
+        s["window"]       = {{"width", w}, {"height", h}};
+        s["camera_count"] = OkCore::getCameraCount();
+        s["fps"]          = measuredFps;
+
+        OkSceneHandler *handler = OkCore::getSceneHandler();
+        OkScene        *scene   = handler ? handler->getCurrentScene() : nullptr;
+        s["scene"]              = {{"object_count", scene ? scene->getObjectCount() : 0}};
+        return s;
+      });
+      state["memory"] = {{"resident_mb", residentMb()}};
+      return textResult(state.dump(2));
+    }
+
+    return errorResult("unknown tool: " + name);
   }
 };
 
 // ---------------------------------------------------------------------------
-// JSON-RPC / MCP handling
+// JSON-RPC helpers
 // ---------------------------------------------------------------------------
 
 namespace {
-
-const char *kProtocolVersion = "2024-11-05";
-const char *kServerName      = "okinawa";
-const char *kServerVersion   = "0.1.0";
 
 json makeError(const json &id, int code, const std::string &message) {
   json response;
@@ -191,19 +484,6 @@ json makeResult(const json &id, const json &result) {
   response["id"]      = id;
   response["result"]  = result;
   return response;
-}
-
-// The single tool exposed in v1.
-json viewFrameToolSchema() {
-  json tool;
-  tool["name"] = "view_frame";
-  tool["description"] =
-      "Capture the current rendered frame of the okinawa app and return it "
-      "as a PNG image, so the agent can visually inspect what is on screen.";
-  tool["inputSchema"]["type"]                 = "object";
-  tool["inputSchema"]["properties"]           = json::object();
-  tool["inputSchema"]["additionalProperties"] = false;
-  return tool;
 }
 
 }  // namespace
@@ -223,30 +503,23 @@ OkMcpServer::~OkMcpServer() {
 }
 
 void OkMcpServer::start() {
-  // Single MCP endpoint (Streamable HTTP): one POST that carries the
-  // JSON-RPC request and returns a JSON-RPC response.
   _impl->server.Post(
       "/mcp", [this](const httplib::Request &req, httplib::Response &res) {
         json request = json::parse(req.body, nullptr, false);
         if (request.is_discarded() || !request.is_object()) {
-          res.status = 200;
           res.set_content(makeError(nullptr, -32700, "parse error").dump(),
                           "application/json");
           return;
         }
 
-        json id     = request.contains("id") ? request["id"] : json(nullptr);
-        std::string method =
-            request.value("method", std::string());
-        json params = request.contains("params") ? request["params"]
-                                                  : json::object();
-
-        // Notifications (no id) get no response body.
+        json        id = request.contains("id") ? request["id"] : json(nullptr);
+        std::string method = request.value("method", std::string());
+        json        params =
+            request.contains("params") ? request["params"] : json::object();
         bool isNotification = !request.contains("id");
 
         if (method == "initialize") {
           json result;
-          // Echo the client's protocol version when present.
           result["protocolVersion"] =
               params.value("protocolVersion", std::string(kProtocolVersion));
           result["capabilities"]["tools"] = json::object();
@@ -254,8 +527,7 @@ void OkMcpServer::start() {
           result["serverInfo"]["version"] = kServerVersion;
           res.set_header("Mcp-Session-Id", "okinawa-mcp");
           res.set_content(makeResult(id, result).dump(), "application/json");
-        } else if (method == "notifications/initialized" ||
-                   method.rfind("notifications/", 0) == 0) {
+        } else if (method.rfind("notifications/", 0) == 0) {
           res.status = 202;
           res.set_content("", "application/json");
         } else if (method == "ping") {
@@ -263,33 +535,14 @@ void OkMcpServer::start() {
                           "application/json");
         } else if (method == "tools/list") {
           json result;
-          result["tools"] = json::array({viewFrameToolSchema()});
+          result["tools"] = _impl->toolList();
           res.set_content(makeResult(id, result).dump(), "application/json");
         } else if (method == "tools/call") {
           std::string name = params.value("name", std::string());
-          if (name == "view_frame") {
-            CaptureResult capture = _impl->captureFrame();
-            json          result;
-            if (capture.ok) {
-              json image;
-              image["type"]     = "image";
-              image["data"]     = capture.base64Png;
-              image["mimeType"] = "image/png";
-              result["content"] = json::array({image});
-              result["isError"] = false;
-            } else {
-              json text;
-              text["type"]      = "text";
-              text["text"]      = "view_frame failed: " + capture.error;
-              result["content"] = json::array({text});
-              result["isError"] = true;
-            }
-            res.set_content(makeResult(id, result).dump(), "application/json");
-          } else {
-            res.set_content(
-                makeError(id, -32602, "unknown tool: " + name).dump(),
-                "application/json");
-          }
+          json        args = params.contains("arguments") ? params["arguments"]
+                                                           : json::object();
+          json        result = _impl->callTool(name, args);
+          res.set_content(makeResult(id, result).dump(), "application/json");
         } else if (isNotification) {
           res.status = 202;
           res.set_content("", "application/json");
@@ -320,6 +573,16 @@ void OkMcpServer::stop() {
 }
 
 void OkMcpServer::drainCommands() {
+  // Track a simple measured frame rate (this runs once per rendered frame).
+  double now = glfwGetTime();
+  if (_impl->lastFrameTime > 0.0) {
+    double dt = now - _impl->lastFrameTime;
+    if (dt > 0.0) {
+      _impl->fps = _impl->fps * 0.9 + (1.0 / dt) * 0.1;
+    }
+  }
+  _impl->lastFrameTime = now;
+
   std::deque<std::function<void()>> local;
   {
     std::lock_guard<std::mutex> lock(_impl->queueMutex);

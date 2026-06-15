@@ -43,6 +43,8 @@ public:
   // Camera management
   static void addCamera(OkCamera *camera);
   static void switchCamera(int index);
+  static int  getCurrentCameraIndex() { return _currentCamera; }
+  static int  getCameraCount() { return static_cast<int>(_cameras.size()); }
 
   // Enable the in-engine MCP server so an external agent can connect over
   // local HTTP and drive the app (v1: capture the rendered frame). Binds
