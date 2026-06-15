@@ -60,7 +60,7 @@ assets/*
 okinawa
 tests/okinawa*
 
-# copilot
-.github/copilot*
-
 .cache/
+
+# claude
+.claude/

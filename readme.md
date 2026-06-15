@@ -6,33 +6,39 @@
 
 This is a work in progress C++ 3D game engine, inspired by [okinawa.js](https://github.com/okinawa-dev/okinawa.js), a previous version coded in JavaScript. The goal is to create a game engine that is easy to use, flexible, and powerful. The engine is designed to be modular, so you can easily add or remove features as needed.
 
-The engine is distributed as a Conan package for easy integration into C++ projects. I'm currently testing it on a MacOS machine. Feedback is welcome.
+The engine is built as a static library (`libokinawa.a`) and consumed from source by other projects. I'm currently testing it on a MacOS machine. Feedback is welcome.
 
-With just this repository, without a game, you can just run the test suite and see the coverage report. The engine is not yet ready for production use, but it is a good starting point for learning and experimenting with C++ and game development.
+With just this repository, without a game, you can build the library and run the test suite (with a coverage report). The engine is not yet ready for production use, but it is a good starting point for learning and experimenting with C++ and game development.
 
 ## Compilation
 
+The project is built with [xmake](https://xmake.io), which also manages
+the third-party dependencies through its package manager (xrepo). There
+is no separate dependency-installation step: the dependencies (glm,
+glfw, stb, opengl, catch2) are fetched and built automatically on the
+first build.
+
 ### Tools needed
 
+- [xmake](https://xmake.io/): A cross-platform build utility with a built-in package manager.
 - [clang](https://clang.llvm.org/): A compiler for C and C++ languages.
-- [cmake](https://cmake.org/): A cross-platform build system generator.
-- [conan](https://conan.io/): A package manager for C and C++ libraries.
 
 For development:
 
-- I am using `clang-format` to format the code, current configuration is in the `.clang-format` file. 
+- I am using `clang-format` to format the code, current configuration is in the `.clang-format` file.
 - I am using `clang-tidy` to check the code for errors and warnings, current configuration is in the `.clang-tidy` file.
+- `llvm` tools (`llvm-profdata`, `llvm-cov`) are needed for the coverage report.
 
 ### Tools installation
 
 #### MacOS
 
 ```bash
-# Install Xcode Command Line Tools (includes clang and make)
+# Install Xcode Command Line Tools (includes clang)
 xcode-select --install
 
-# Install Conan using Homebrew (package manager for macOS)
-brew install conan
+# Install xmake using Homebrew (package manager for macOS)
+brew install xmake
 
 # Install LLVM tools for code formatting, analysis and coverage
 brew install llvm
@@ -41,151 +47,67 @@ brew install llvm
 export PATH="/opt/homebrew/opt/llvm/bin/:$PATH"
 ```
 
-Verify installations (versions used at the time of writing):
-
-```bash
-clang --version
-Apple clang version 17.0.0 (clang-1700.0.13.3)
-...
-
-cmake --version
-cmake version 4.0.1
-...
-
-conan --version
-Conan version 2.15.1
-```
-
 At the moment I'm only testing the code on MacOS.
 
 ### Build
 
-#### Debug build
-
 ```bash
-# Install conan dependencies (do this once)
-conan install . --output-folder=build -s build_type=Debug --build=missing
+# Build the library (debug by default). On the first run xmake will
+# download and build the dependencies automatically.
+xmake
 
-# Configure CMake
-cmake --preset debug
+# Build a specific target
+xmake build okinawa       # just the library
+xmake build okinawa_test  # just the tests
 
-# Build everything (library, executable and tests)
-cmake --build --preset debug
-
-# Or build specific targets
-cmake --build --preset debug --target okinawa       # Just the library
-cmake --build --preset debug --target okinawa_test  # Just the tests
+# Release build
+xmake f -m release && xmake
 ```
 
-#### Release build
+## Consuming the engine
 
-```bash
-# Install conan dependencies (do this once)
-conan install . --output-folder=build -s build_type=Release --build=missing
+The engine is consumed from source by other xmake projects (for example
+`wadviewer` and `heist`) as a local sub-dependency. This lets you edit
+the engine and the consuming app together and just rebuild the app,
+without producing or reinstalling any binary package. The exact wiring
+lives in each consumer's `xmake.lua`.
 
-# Configure CMake
-cmake --preset release
-
-# Build everything (library and executable)
-cmake --build --preset release
-
-# Or build specific targets
-cmake --build --preset release --target okinawa       # Just the library
-```
-
-## Package Distribution
-
-### Creating the Conan Package
-
-To use okinawa.cpp in other projects, you need to create it as a local Conan package:
-
-```bash
-# Create the package in your local Conan cache
-conan create . --build=missing
-
-# This will build and install the package as okinawa/0.1.0
-```
-
-The package includes:
-- **Library**: `libokinawa.a` (static library)
-- **Headers**: All public headers under `okinawa/` namespace
-- **Dependencies**: Automatically manages glm, glfw, stb, and OpenGL dependencies
-
-### Using the Package in Other Projects
-
-In your project's `conanfile.txt`:
-
-```ini
-[requires]
-okinawa/0.1.0
-# ... other dependencies ...
-
-[generators]
-CMakeDeps
-CMakeToolchain
-```
-
-In your project's `CMakeLists.txt`:
-
-```cmake
-find_package(okinawa REQUIRED)
-target_link_libraries(your_target PRIVATE okinawa::okinawa)
-```
-
-Include headers in your C++ code:
+Public headers are included with an `okinawa/` prefix from consumers,
+e.g.:
 
 ```cpp
 #include "okinawa/core/core.hpp"
 #include "okinawa/core/camera.hpp"
-// ... other okinawa headers as needed ...
 ```
 
-### Package Development Workflow
-
-When developing the okinawa engine:
-
-1. **Make changes** to the source code
-2. **Test locally** using the build commands above
-3. **Recreate the package** when ready to use in other projects:
-   ```bash
-   conan create . --build=missing
-   ```
-4. **Rebuild dependent projects** to use the updated package
-
-### Other tools
-
-#### Code checking
+## Tests
 
 ```bash
-# Check code formatting
-clang-tidy -p=build src/*.cpp src/*/*.cpp
-```
+# Run the test suite (rundir is set to the project root)
+xmake run okinawa_test
 
-### Tests
-
-To run the tests (from project root):
-
-```bash
-# Run tests through CTest
-ctest --test-dir build --output-on-failure
-
-# Or run test executable directly for more verbose output
-cd build 
-./bin/okinawa_test
-cd ..
+# Or through xmake's test runner
+xmake test
 ```
 
 To generate a code coverage report:
 
 ```bash
-# Build and run tests with coverage 
-cmake --build build --target coverage
+# Build and run tests with llvm source-based coverage
+xmake coverage
 
 # Open the coverage report
-open build/coverage/index.html
+open coverage/index.html
 ```
 
 The tests are located in the `tests` folder and use the [Catch2](https://github.com/catchorg/Catch2) testing framework. The coverage report shows detailed line-by-line code coverage information.
+
+### Code checking
+
+```bash
+# Run clang-tidy using the generated compile_commands.json
+clang-tidy -p . src/**/*.cpp
+```
 
 ## Libraries used
 
