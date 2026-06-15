@@ -1,3 +1,8 @@
+// The whole implementation is gated on OKINAWA_WITH_MCP (xmake option "mcp").
+// When the server is not compiled in, this is an empty translation unit, so
+// no MCP/HTTP code (or its header-only dependencies) ends up in the binary.
+#ifdef OKINAWA_WITH_MCP
+
 #include "mcp-server.hpp"
 
 #include "../core/core.hpp"  // OkCore::getWindow + OpenGL / GLFW headers
@@ -324,3 +329,5 @@ void OkMcpServer::drainCommands() {
     local[i]();
   }
 }
+
+#endif  // OKINAWA_WITH_MCP

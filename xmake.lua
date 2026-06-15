@@ -22,14 +22,17 @@ add_rules("plugin.compile_commands.autoupdate", {outputdir = ".", lsp = "clangd"
 add_rules("mode.debug", "mode.release")
 set_defaultmode("debug")
 
--- Compile-time toggle for the in-engine MCP server. Default: on in debug,
--- off in release. Force either way with `xmake f --mcp=y` / `--mcp=n`.
--- When off, the src/okinawa/mcp sources and their extra dependencies
--- (cpp-httplib, nlohmann_json) are excluded entirely.
+-- Compile-time toggle for the in-engine MCP server. Compiled in by default;
+-- pass `xmake f --mcp=n` to exclude it (e.g. for lean release builds), or
+-- `--mcp=y` to be explicit. The option carries the OKINAWA_WITH_MCP define
+-- and is wired to the engine target with add_options below; mcp-server.cpp is
+-- guarded by that define, so when the option is off it compiles to nothing
+-- and no MCP/HTTP code (or its header-only deps) lands in the binary.
 option("mcp")
-    set_default(is_mode("debug"))
+    set_default(true)
     set_showmenu(true)
-    set_description("Compile the in-engine MCP server")
+    set_description("Compile the in-engine MCP server (default: on; --mcp=n to exclude)")
+    add_defines("OKINAWA_WITH_MCP")
 option_end()
 
 -- Third-party dependencies (resolved from xrepo). Must live in the root scope.
@@ -38,12 +41,8 @@ add_requires("glfw")
 add_requires("stb")
 add_requires("opengl")
 add_requires("catch2")              -- only used by the test target
-
--- MCP server dependencies, only fetched when the feature is enabled.
-if has_config("mcp") then
-    add_requires("cpp-httplib")
-    add_requires("nlohmann_json")
-end
+add_requires("cpp-httplib")         -- MCP server (header-only)
+add_requires("nlohmann_json")       -- MCP server (header-only)
 
 -- =========================================================================
 -- Engine static library
@@ -60,14 +59,11 @@ target("okinawa")
     add_includedirs("src", {public = true})    -- public: consumers use okinawa/ prefix
     add_packages("glm", "glfw", "stb", "opengl", {public = true})
 
-    -- In-engine MCP server: compile its sources + deps only when enabled,
-    -- otherwise exclude them from the build entirely.
-    if has_config("mcp") then
-        add_defines("OKINAWA_WITH_MCP")
-        add_packages("cpp-httplib", "nlohmann_json")
-    else
-        remove_files("src/okinawa/mcp/**.cpp")
-    end
+    -- In-engine MCP server: add_options applies the "mcp" option's
+    -- OKINAWA_WITH_MCP define when it is enabled. mcp-server.cpp is guarded by
+    -- that define, so it compiles to nothing when the option is off.
+    add_options("mcp")
+    add_packages("cpp-httplib", "nlohmann_json")
 
     -- macOS windowing/runtime frameworks required by GLFW.
     if is_plat("macosx") then
