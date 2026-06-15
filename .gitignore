@@ -55,6 +55,8 @@ assets/*
 # tmp
 okinawa
 tests/okinawa*
+# but keep the editable-mode include prefix symlink (include/okinawa -> ../src)
+!include/okinawa
 
 # copilot
 .github/copilot*

@@ -21,6 +21,19 @@ class OkinawaConan(ConanFile):
     def build_requirements(self):
         self.test_requires("catch2/3.8.0")
         
+    def layout(self):
+        # Editable mode: consumers (wadviewer, heist) read headers and the
+        # freshly built static lib straight from this source tree, so we can
+        # edit the engine and just rebuild the consumer (no conan create).
+        # Headers are exposed under an "okinawa/" prefix via the committed
+        # symlink include/okinawa -> ../src, matching the packaged layout
+        # (install(DIRECTORY src/ DESTINATION include/okinawa)).
+        # Folders are left untouched so the engine's own
+        # `conan install . --output-folder=build` + `cmake --preset` flow
+        # keeps writing to build/ exactly as before.
+        self.cpp.source.includedirs = ["include"]
+        self.cpp.build.libdirs = ["build"]
+
     def generate(self):
         deps = CMakeDeps(self)
         deps.generate()
