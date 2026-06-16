@@ -53,6 +53,11 @@ public:
   // does nothing, so apps compile identically with or without the server.
   static void enableMcpServer(int port = 8765);
 
+  // Ignore the user's physical keyboard/mouse input (e.g. when an instance is
+  // meant to be driven only through the MCP server). Injected/MCP input still
+  // works. Call after initialize().
+  static void setIgnoreUserInput(bool ignore);
+
 private:
   static bool initializeOpenGL(int width, int height);
   static bool initializeShaders();

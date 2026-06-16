@@ -23,6 +23,7 @@ OkInput::OkInput(GLFWwindow *window, MouseCallback callback) {
   std::memset(_currentKeys, 0, sizeof(_currentKeys));
   std::memset(_prevKeys, 0, sizeof(_prevKeys));
   std::memset(_injectedUntil, 0, sizeof(_injectedUntil));
+  _physicalEnabled = true;
 
   OkLogger::info("Input", "Setting mouse callback...");
   glfwSetCursorPosCallback(window, _mouseCallback);
@@ -48,7 +49,7 @@ void OkInput::process() {
   for (int i = 0; i < OK_KEY_COUNT; i++) {
     OkKey okKey    = static_cast<OkKey>(i);
     int   glfwKey  = OkKeys::okKeyToGLFW(okKey);
-    bool  physical = glfwKey != GLFW_KEY_UNKNOWN &&
+    bool  physical = _physicalEnabled && glfwKey != GLFW_KEY_UNKNOWN &&
                     glfwGetKey(_window, glfwKey) == GLFW_PRESS;
     bool injected   = now < _injectedUntil[i];
     _currentKeys[i] = physical || injected;
@@ -144,5 +145,18 @@ void OkInput::injectKey(OkKey key, double durationSeconds) {
   // Extend, never shorten, an existing injection window for this key.
   if (until > _injectedUntil[key]) {
     _injectedUntil[key] = until;
+  }
+}
+
+/**
+ * @brief Enable or disable physical keyboard/mouse input.
+ * @param enabled True to use real input, false for MCP-only control.
+ */
+void OkInput::setPhysicalInputEnabled(bool enabled) {
+  _physicalEnabled = enabled;
+  if (_window) {
+    // Release the cursor when ignoring input so it is not captured/hidden.
+    glfwSetInputMode(_window, GLFW_CURSOR,
+                     enabled ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
   }
 }

@@ -73,6 +73,13 @@ public:
   // edge-triggered actions. Call from the engine loop thread.
   void injectKey(OkKey key, double durationSeconds);
 
+  // Enable/disable physical (keyboard/mouse) input. When disabled, process()
+  // ignores glfwGetKey polling (injected keys still apply) and the cursor is
+  // released (GLFW_CURSOR_NORMAL); useful to drive an instance only via the
+  // MCP server without the user's input interfering.
+  void setPhysicalInputEnabled(bool enabled);
+  bool isPhysicalInputEnabled() const { return _physicalEnabled; }
+
   // Constants
   static constexpr float MOVE_SPEED     = 5.0f;
   static constexpr float ROTATION_SPEED = 2.0f;
@@ -87,6 +94,8 @@ private:
   // Per-key "injected until" timestamps (glfwGetTime seconds). A key counts as
   // pressed while glfwGetTime() < _injectedUntil[key].
   double        _injectedUntil[OK_KEY_COUNT];
+  // When false, physical keyboard/mouse input is ignored (MCP-only control).
+  bool          _physicalEnabled;
 };
 
 #endif

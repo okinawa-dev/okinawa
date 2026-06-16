@@ -309,6 +309,17 @@ void OkCore::loop(const OkCoreCallback &stepCallback,
 }
 
 /**
+ * @brief Ignore (or restore) the user's physical keyboard/mouse input.
+ *        See core.hpp. MCP-injected input is unaffected.
+ * @param ignore True to ignore physical input, false to restore it.
+ */
+void OkCore::setIgnoreUserInput(bool ignore) {
+  if (_input != nullptr) {
+    _input->setPhysicalInputEnabled(!ignore);
+  }
+}
+
+/**
  * @brief Mouse callback function for handling mouse movement.
  *        This function updates the camera direction based on mouse movement.
  * @param window The GLFW window that received the event.
@@ -319,6 +330,15 @@ void OkCore::mouseCallback(GLFWwindow *window, double xpos, double ypos) {
   static float lastX      = static_cast<float>(xpos);
   static float lastY      = static_cast<float>(ypos);
   static bool  firstMouse = true;
+
+  // Ignore mouse-look when physical input is disabled (--no-input) or when the
+  // window is not focused, so moving the mouse in another app does not rotate
+  // the view. Re-baseline so refocusing does not cause a sudden jump.
+  if ((_input != nullptr && !_input->isPhysicalInputEnabled()) ||
+      (window != nullptr && glfwGetWindowAttrib(window, GLFW_FOCUSED) == 0)) {
+    firstMouse = true;
+    return;
+  }
 
   if (firstMouse) {
     lastX      = static_cast<float>(xpos);
