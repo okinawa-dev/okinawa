@@ -22,17 +22,30 @@ add_rules("plugin.compile_commands.autoupdate", {outputdir = ".", lsp = "clangd"
 add_rules("mode.debug", "mode.release")
 set_defaultmode("debug")
 
--- Compile-time toggle for the in-engine MCP server. Compiled in by default;
--- pass `xmake f --mcp=n` to exclude it (e.g. for lean release builds), or
--- `--mcp=y` to be explicit. The option carries the OKINAWA_WITH_MCP define
--- and is wired to the engine target with add_options below; mcp-server.cpp is
--- guarded by that define, so when the option is off it compiles to nothing
--- and no MCP/HTTP code (or its header-only deps) lands in the binary.
+-- Compile-time toggle for the in-engine MCP server.
+--
+-- DEFAULT is mode-dependent: ON in debug, OFF in release. That decision is made
+-- by the COMPILER (NDEBUG) in mcp-config.hpp, not here: xmake cannot read the
+-- build mode at a phase that also propagates through `includes()` to consumers
+-- (wadviewer) -- is_mode()/get_config("mode") are nil at global scope, a
+-- per-target on_config does not run for an included sub-target, and an option's
+-- dynamic on_check defines do not propagate either. Only an option's STATIC
+-- add_defines propagates, so the OVERRIDE uses two such options (use at most
+-- one); each sets OKINAWA_MCP_FORCE, which mcp-config.hpp honours:
+--   xmake f --mcp=y      force the server ON  (e.g. MCP in a release build)
+--   xmake f --no-mcp=y   force the server OFF (e.g. a lean debug build)
 option("mcp")
-    set_default(true)
+    set_default(false)
     set_showmenu(true)
-    set_description("Compile the in-engine MCP server (default: on; --mcp=n to exclude)")
-    add_defines("OKINAWA_WITH_MCP")
+    set_description("Force-compile the in-engine MCP server (override the debug/release default)")
+    add_defines("OKINAWA_MCP_FORCE=1")
+option_end()
+
+option("no-mcp")
+    set_default(false)
+    set_showmenu(true)
+    set_description("Force-exclude the in-engine MCP server (override the debug/release default)")
+    add_defines("OKINAWA_MCP_FORCE=0")
 option_end()
 
 -- Third-party dependencies (resolved from xrepo). Must live in the root scope.
@@ -59,10 +72,12 @@ target("okinawa")
     add_includedirs("src", {public = true})    -- public: consumers use okinawa/ prefix
     add_packages("glm", "glfw", "stb", "opengl", {public = true})
 
-    -- In-engine MCP server: add_options applies the "mcp" option's
-    -- OKINAWA_WITH_MCP define when it is enabled. mcp-server.cpp is guarded by
-    -- that define, so it compiles to nothing when the option is off.
-    add_options("mcp")
+    -- In-engine MCP server: add_options applies the OKINAWA_MCP_FORCE define
+    -- from whichever of --mcp / --no-mcp is set (neither -> NDEBUG default).
+    -- mcp-config.hpp turns that into OKINAWA_WITH_MCP, which guards
+    -- mcp-server.cpp (an empty TU when off). The header-only deps are always
+    -- linked (harmless: only #included from inside that guard).
+    add_options("mcp", "no-mcp")
     add_packages("cpp-httplib", "nlohmann_json")
 
     -- macOS windowing/runtime frameworks required by GLFW.
