@@ -166,9 +166,28 @@ bool OkCore::initializeOpenGL(int width, int height) {
   }
 
   glfwMakeContextCurrent(_window);
-  glViewport(0, 0, width, height);
+
+  // Use the actual framebuffer size, not the logical window size, for the
+  // viewport. On HiDPI / Retina displays the framebuffer is larger (e.g. 2x),
+  // so using the window size renders the scene into only part of the window
+  // (the lower-left quarter at 2x). Keep it in sync on DPI/size changes.
+  int framebufferWidth  = 0;
+  int framebufferHeight = 0;
+  glfwGetFramebufferSize(_window, &framebufferWidth, &framebufferHeight);
+  glViewport(0, 0, framebufferWidth, framebufferHeight);
+  glfwSetFramebufferSizeCallback(_window, &OkCore::framebufferSizeCallback);
 
   return true;
+}
+
+/**
+ * @brief Keep the OpenGL viewport in sync with the framebuffer size.
+ * @param width  New framebuffer width in pixels.
+ * @param height New framebuffer height in pixels.
+ */
+void OkCore::framebufferSizeCallback(GLFWwindow * /*window*/, int width,
+                                     int height) {
+  glViewport(0, 0, width, height);
 }
 
 /**

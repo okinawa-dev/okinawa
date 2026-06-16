@@ -71,6 +71,9 @@ private:
   static OkMcpServer            *_mcpServer;
 
   static void mouseCallback(GLFWwindow *window, double xpos, double ypos);
+  // Keep the GL viewport matching the (possibly HiDPI) framebuffer size.
+  static void framebufferSizeCallback(GLFWwindow *window, int width,
+                                      int height);
 };
 
 #endif
