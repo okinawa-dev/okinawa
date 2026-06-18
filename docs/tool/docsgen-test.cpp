@@ -120,3 +120,13 @@ TEST_CASE("renderTemplate fills all placeholders", "[docs]") {
           "<title>Items</title><nav><ul></ul></nav><main><p>x</p></main>"
           "<link href=\"/okinawa.cpp/static/docs.css\">");
 }
+
+TEST_CASE("renderMarkdown emits html, including GFM tables", "[docs]") {
+  std::string h1 = docsgen::renderMarkdown("# Hello\n");
+  REQUIRE(h1.find("<h1") != std::string::npos);
+  REQUIRE(h1.find("Hello") != std::string::npos);
+
+  std::string table = docsgen::renderMarkdown(
+      "| A | B |\n| - | - |\n| 1 | 2 |\n");
+  REQUIRE(table.find("<table") != std::string::npos);
+}

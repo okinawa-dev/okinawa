@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cstdlib>
 
+#include <md4c-html.h>
+
 namespace {
 
 std::string trim(const std::string &s) {
@@ -77,6 +79,11 @@ std::string prefixRootRel(const std::string &html, const std::string &token,
     i = after;
   }
   return out;
+}
+
+void mdSink(const MD_CHAR *text, MD_SIZE size, void *userdata) {
+  std::string *out = static_cast<std::string *>(userdata);
+  out->append(text, size);
 }
 
 }  // namespace
@@ -199,6 +206,12 @@ std::string renderTemplate(const std::string &tmpl, const std::string &title,
   return out;
 }
 
-std::string renderMarkdown(const std::string &markdown) { return markdown; }
+std::string renderMarkdown(const std::string &markdown) {
+  std::string out;
+  unsigned parserFlags = MD_DIALECT_GITHUB;
+  md_html(markdown.data(), static_cast<MD_SIZE>(markdown.size()), mdSink, &out,
+          parserFlags, 0);
+  return out;
+}
 
 }  // namespace docsgen
