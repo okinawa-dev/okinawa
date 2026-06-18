@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a Markdown-driven documentation website for the Okinawa engine, rendered by a small C++/xmake static-site generator and deployed to GitHub Pages at `https://okinawa-dev.github.io/okinawa.cpp/`.
+**Goal:** Build a Markdown-driven documentation website for the Okinawa engine, rendered by a small C++/xmake static-site generator and deployed to GitHub Pages at `https://okinawa-dev.github.io/okinawa/`.
 
 **Architecture:** A standalone C++17 generator (`docs/tool`) parses Markdown files with front-matter, renders them to HTML with md4c, fills a single HTML template, and writes a static site to `docs/dist/`. The generator does NOT link the engine. Pure helpers live in `docsgen.{hpp,cpp}` and are unit-tested with Catch2; `main.cpp` wires CLI + filesystem + md4c. The visual template/CSS are authored separately with the `impeccable` skill. A GitHub Actions workflow builds and deploys on push to `master`.
 
@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-18-okinawa-docs-site-design.md`
 
-**Repo:** all work in `okinawa-dev/okinawa.cpp` (the standalone checkout at `/Users/ialonso/Projects/neverbot/okinawa.cpp`). The engine code style avoids C++17 library features; the docs **tool** is build-time tooling, separate from the engine, and may use `<filesystem>` and standard C++17 freely.
+**Repo:** all work in `okinawa-dev/okinawa` (the standalone checkout at `/Users/ialonso/Projects/neverbot/okinawa`). The engine code style avoids C++17 library features; the docs **tool** is build-time tooling, separate from the engine, and may use `<filesystem>` and standard C++17 freely.
 
 ---
 
@@ -199,7 +199,7 @@ int main(int argc, char **argv) {
   (void)argv;
   std::printf(
       "okinawa-docs: usage: okinawa-docs --in docs/content --out docs/dist "
-      "[--base-url /okinawa.cpp] [--template docs/templates/layout.html] "
+      "[--base-url /okinawa] [--template docs/templates/layout.html] "
       "[--static docs/static]\n");
   return 0;
 }
@@ -668,10 +668,10 @@ TEST_CASE("applyBaseUrl prefixes only root-relative urls", "[docs]") {
       "<a href=\"#anchor\">y</a>"
       "<a href=\"https://x.test/p\">z</a>"
       "<a href=\"//cdn.test/a\">w</a>";
-  std::string out = docsgen::applyBaseUrl(in, "/okinawa.cpp");
-  REQUIRE(out.find("href=\"/okinawa.cpp/getting-started.html\"") !=
+  std::string out = docsgen::applyBaseUrl(in, "/okinawa");
+  REQUIRE(out.find("href=\"/okinawa/getting-started.html\"") !=
           std::string::npos);
-  REQUIRE(out.find("src=\"/okinawa.cpp/static/logo.png\"") !=
+  REQUIRE(out.find("src=\"/okinawa/static/logo.png\"") !=
           std::string::npos);
   REQUIRE(out.find("href=\"#anchor\"") != std::string::npos);
   REQUIRE(out.find("href=\"https://x.test/p\"") != std::string::npos);
@@ -688,10 +688,10 @@ TEST_CASE("renderTemplate fills all placeholders", "[docs]") {
       "<title>{{title}}</title><nav>{{nav}}</nav><main>{{content}}</main>"
       "<link href=\"{{base_url}}/static/docs.css\">";
   std::string out = docsgen::renderTemplate(tmpl, "Items", "<ul></ul>", "<p>x</p>",
-                                            "/okinawa.cpp");
+                                            "/okinawa");
   REQUIRE(out ==
           "<title>Items</title><nav><ul></ul></nav><main><p>x</p></main>"
-          "<link href=\"/okinawa.cpp/static/docs.css\">");
+          "<link href=\"/okinawa/static/docs.css\">");
 }
 ```
 
@@ -968,11 +968,11 @@ xmake build okinawa-docs
 mkdir -p /tmp/okidocs/content/reference
 printf -- '---\ntitle: Home\nsection: Start\nnav_order: 1\n---\n# Okinawa\n\nWelcome.\n' > /tmp/okidocs/content/index.md
 printf -- '---\ntitle: Items\nsection: Reference\nnav_order: 1\n---\n# Items\n\n| A | B |\n| - | - |\n| 1 | 2 |\n' > /tmp/okidocs/content/reference/items.md
-xmake run okinawa-docs --in /tmp/okidocs/content --out /tmp/okidocs/dist --base-url /okinawa.cpp --static docs/static
+xmake run okinawa-docs --in /tmp/okidocs/content --out /tmp/okidocs/dist --base-url /okinawa --static docs/static
 ```
 
 Run: `cat /tmp/okidocs/dist/reference/items.html`
-Expected: an HTML page whose `<nav>` contains `href="/okinawa.cpp/index.html"` is **absent** (home excluded) but a Reference group with `href="/okinawa.cpp/reference/items.html"` marked `active` is present, and `<main>` contains a `<table>`. The stylesheet link reads `href="/okinawa.cpp/static/docs.css"`.
+Expected: an HTML page whose `<nav>` contains `href="/okinawa/index.html"` is **absent** (home excluded) but a Reference group with `href="/okinawa/reference/items.html"` marked `active` is present, and `<main>` contains a `<table>`. The stylesheet link reads `href="/okinawa/static/docs.css"`.
 
 - [ ] **Step 7: Verify a no-base-url local build keeps links root-relative**
 
@@ -1009,7 +1009,7 @@ cp assets/project/okinawa_logo.png docs/static/okinawa_logo.png
 Requirements to hand to the skill:
 - Single template `docs/templates/layout.html` that keeps the four placeholders the generator fills verbatim: `{{title}}`, `{{nav}}`, `{{content}}`, `{{base_url}}`.
 - Okinawa's own visual identity (use `{{base_url}}/static/okinawa_logo.png` for the brand), NOT the GitHub-like look of nottario/owl.
-- Layout: top bar (brand + a GitHub link to `https://github.com/okinawa-dev/okinawa.cpp`), left sidebar rendering `{{nav}}` (the generator emits `<div class="nav-section">` + `<ul><li><a>` with `class="active"` on the current page — style these), main article column for `{{content}}`.
+- Layout: top bar (brand + a GitHub link to `https://github.com/okinawa-dev/okinawa`), left sidebar rendering `{{nav}}` (the generator emits `<div class="nav-section">` + `<ul><li><a>` with `class="active"` on the current page — style these), main article column for `{{content}}`.
 - Readable, scrollable code blocks (the site is code-heavy).
 - Responsive: usable on laptop and phone (sidebar collapses or stacks on narrow screens).
 - Light theme baseline; dark mode optional.
@@ -1090,17 +1090,17 @@ dependencies automatically.
 
 ## Consume the engine as a submodule
 
-Vendor the engine at `okinawa.cpp` and build it from source:
+Vendor the engine at `okinawa` and build it from source:
 
 ```bash
-git submodule add https://github.com/okinawa-dev/okinawa.cpp okinawa.cpp
+git submodule add https://github.com/okinawa-dev/okinawa okinawa
 git submodule update --init
 ```
 
 In your `xmake.lua`:
 
 ```lua
-includes("okinawa.cpp")
+includes("okinawa")
 
 target("myapp")
     set_kind("binary")
@@ -1271,7 +1271,7 @@ jobs:
         run: xmake build -y okinawa-docs
 
       - name: Generate the site
-        run: xmake run okinawa-docs --in docs/content --out docs/dist --base-url /okinawa.cpp --static docs/static
+        run: xmake run okinawa-docs --in docs/content --out docs/dist --base-url /okinawa --static docs/static
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -1303,8 +1303,8 @@ git commit -m "ci(docs): build the docs site and deploy to GitHub Pages on push 
 - [ ] **Step 4: Human, out-of-band (NOT the agent)**
 
 1. Repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-2. Confirm the published URL is `https://okinawa-dev.github.io/okinawa.cpp/`.
-   If the repo/org name differs, change `--base-url /okinawa.cpp` in the
+2. Confirm the published URL is `https://okinawa-dev.github.io/okinawa/`.
+   If the repo/org name differs, change `--base-url /okinawa` in the
    workflow to match the actual Pages subpath.
 3. Push `master` (or let the next push trigger the workflow) and confirm the
    `docs` workflow goes green and the site is live.
@@ -1314,9 +1314,9 @@ git commit -m "ci(docs): build the docs site and deploy to GitHub Pages on push 
 ## Done criteria
 
 - `xmake` (bare) builds only the engine; `xmake build okinawa-docs` builds the generator; `xmake run okinawa-docs-tests` is green.
-- `xmake run okinawa-docs --in docs/content --out docs/dist --base-url /okinawa.cpp --static docs/static` writes a complete static site to `docs/dist/`.
+- `xmake run okinawa-docs --in docs/content --out docs/dist --base-url /okinawa --static docs/static` writes a complete static site to `docs/dist/`.
 - The site has a designed shell (impeccable), a getting-started guide, 8 reference pages, and the 2 tutorials, with a working grouped sidebar.
-- Pushing to `master` builds and deploys to `https://okinawa-dev.github.io/okinawa.cpp/` (after the human enables Pages → GitHub Actions).
+- Pushing to `master` builds and deploys to `https://okinawa-dev.github.io/okinawa/` (after the human enables Pages → GitHub Actions).
 
 ## Nottario mapping
 

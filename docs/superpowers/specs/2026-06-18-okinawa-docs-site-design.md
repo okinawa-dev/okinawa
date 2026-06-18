@@ -1,14 +1,14 @@
 # Okinawa documentation site — design
 
 **Date:** 2026-06-18
-**Repo:** `okinawa-dev/okinawa.cpp` (branch `master`)
+**Repo:** `okinawa-dev/okinawa` (branch `master`)
 **Status:** approved design, pending implementation plan
 
 ## Goal
 
 A documentation website for the **Okinawa engine**, authored in Markdown,
 built on every push to `master` and deployed automatically to GitHub Pages
-at `https://okinawa-dev.github.io/okinawa.cpp/`.
+at `https://okinawa-dev.github.io/okinawa/`.
 
 Two pillars:
 
@@ -108,11 +108,11 @@ uses, so okinawa documents okinawa with its own tooling.
 ### CLI
 
 ```
-okinawa-docs --in docs/content --out docs/dist --base-url /okinawa.cpp
+okinawa-docs --in docs/content --out docs/dist --base-url /okinawa
 ```
 
 `--base-url` prefixes every internal link and asset reference so the site
-works under the `/okinawa.cpp` Pages subpath. Default `--base-url` is
+works under the `/okinawa` Pages subpath. Default `--base-url` is
 empty (for local preview at the filesystem root).
 
 ## Visual design (impeccable)
@@ -141,7 +141,7 @@ New workflow `.github/workflows/docs.yml`:
 - **Concurrency:** single-flight `github-pages` environment.
 - **Steps:** checkout → `xmake-io/setup-xmake-action` → `xmake build
   okinawa-docs` → run
-  `xmake run okinawa-docs --in docs/content --out docs/dist --base-url /okinawa.cpp`
+  `xmake run okinawa-docs --in docs/content --out docs/dist --base-url /okinawa`
   → `actions/upload-pages-artifact` with `path: docs/dist` →
   `actions/deploy-pages@v5`.
 
@@ -167,13 +167,13 @@ CI fast).
 ## Out-of-band actions (require the user — not done by the agent)
 
 1. Enable **GitHub Pages → Source: GitHub Actions** in the repo settings.
-2. Confirm the repo is `okinawa-dev/okinawa.cpp` so `--base-url
-   /okinawa.cpp` and the Pages URL are correct. (Verified from
-   `git remote`: `git@github.com:okinawa-dev/okinawa.cpp.git`.)
+2. Confirm the repo is `okinawa-dev/okinawa` so `--base-url
+   /okinawa` and the Pages URL are correct. (Verified from
+   `git remote`: `git@github.com:okinawa-dev/okinawa.git`.)
 
 ## Tracking
 
-Tracked in Nottario under role **okinawa** (work in the okinawa.cpp repo).
+Tracked in Nottario under role **okinawa** (work in the okinawa repo).
 
 ## Build / work order
 
