@@ -8,10 +8,12 @@ nav_order: 1
 
 Okinawa is consumed from source. The recommended way to add it to a project is as a git submodule built with [xmake](https://xmake.io), which also fetches the engine's third-party dependencies (glm, glfw, stb, opengl) automatically on the first build.
 
+Not using xmake? See [Other build systems](/other-build-systems.html) for consuming the engine from CMake, Make, and similar.
+
 ## Add the engine as a submodule
 
 ```bash
-git submodule add https://github.com/neverbot/okinawa.cpp okinawa.cpp
+git submodule add https://github.com/okinawa-dev/okinawa.cpp okinawa.cpp
 git submodule update --init
 ```
 
