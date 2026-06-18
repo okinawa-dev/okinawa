@@ -79,10 +79,12 @@ jobs:
             xmake-${{ runner.os }}-
 
       - name: Build the docs generator
-        run: xmake build -y okinawa-docs
+        # The generator is a standalone xmake project (docs/tool) that pulls
+        # only md4c, so this deploy job needs no OpenGL/X11/GLEW dependencies.
+        run: xmake build -P docs/tool -y okinawa-docs
 
       - name: Generate the site
-        run: xmake run okinawa-docs --in docs/content --out docs/dist --base-url /okinawa.cpp --static docs/static
+        run: xmake run -P docs/tool okinawa-docs --in docs/content --out docs/dist --base-url /okinawa.cpp --static docs/static
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

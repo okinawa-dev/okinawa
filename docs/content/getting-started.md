@@ -85,7 +85,7 @@ From here, see [Creating objects on the fly](/examples/objects-on-the-fly.html) 
 This site uses root-relative links (for example `/reference/core.html`), so the generated pages must be served over HTTP, not opened via `file://`. Build the site and serve it:
 
 ```bash
-xmake run okinawa-docs && python3 -m http.server -d docs/dist
+xmake run -P docs/tool okinawa-docs && python3 -m http.server -d docs/dist
 ```
 
 Then open the printed `http://localhost:8000/` URL. Opening the files directly from disk breaks the links.
