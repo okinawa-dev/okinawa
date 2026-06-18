@@ -21,10 +21,9 @@ public:
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);  // We want OpenGL 4.1
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-#ifdef __APPLE__
+    // Forward-compatible core context, the same as the engine does (required
+    // on macOS, harmless elsewhere).
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-#endif
 
     window = glfwCreateWindow(1, 1, "Test", nullptr, nullptr);
     if (!window) {
@@ -33,17 +32,14 @@ public:
     }
     glfwMakeContextCurrent(window);
 
-#if !defined(__APPLE__)
-    // On non-Apple platforms the OpenGL entry points come from GLEW, which
-    // must be initialized once the context is current; otherwise GL calls
-    // (e.g. glCreateShader in the shader tests) dereference null pointers.
-    glewExperimental = GL_TRUE;
-    if (glewInit() != GLEW_OK) {
+    // Initialize the OpenGL loader the same way the engine does, so the shader
+    // tests get valid GL entry points (on Linux glCreateShader is null until
+    // the loader runs). The platform specifics live in okInitGlLoader().
+    if (!okInitGlLoader()) {
       glfwDestroyWindow(window);
       glfwTerminate();
-      throw std::runtime_error("Failed to initialize GLEW");
+      throw std::runtime_error("Failed to initialize the OpenGL loader");
     }
-#endif
   }
 
   ~TestGLFWContext() {

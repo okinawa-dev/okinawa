@@ -168,18 +168,12 @@ bool OkCore::initializeOpenGL(int width, int height) {
 
   glfwMakeContextCurrent(_window);
 
-#if !defined(__APPLE__)
-  // On non-Apple platforms GLEW provides the OpenGL function pointers; it must
-  // be initialized after a context is made current and before any GL call,
-  // otherwise the GL entry points are null.
-  glewExperimental = GL_TRUE;
-  GLenum glewStatus = glewInit();
-  if (glewStatus != GLEW_OK) {
-    OkLogger::error("Core", "Failed to initialize GLEW");
+  // Initialize the OpenGL function loader (no-op on Apple, glewInit elsewhere).
+  if (!okInitGlLoader()) {
+    OkLogger::error("Core", "Failed to initialize the OpenGL loader");
     glfwTerminate();
     return false;
   }
-#endif
 
   // Use the actual framebuffer size, not the logical window size, for the
   // viewport. On HiDPI / Retina displays the framebuffer is larger (e.g. 2x),

@@ -16,8 +16,8 @@
 #include <OpenGL/gltypes.h>  // IWYU pragma: export
 #else
 // Other platforms (e.g. Linux): use GLEW as the OpenGL function loader. GLEW
-// must be included before GLFW (or any other OpenGL header), and glewInit()
-// must be called once a GL context is current (see OkCore::initializeOpenGL).
+// must be included before GLFW (or any other OpenGL header), and the loader
+// must be initialized once a GL context is current (see okInitGlLoader).
 #include <GL/glew.h>  // IWYU pragma: export
 #endif
 
@@ -26,5 +26,13 @@
 // and to avoid warnings about missing includes when using strict configuration
 
 #include <GLFW/glfw3.h>  // IWYU pragma: export
+
+// Initialize the OpenGL function loader for the current platform. Call once,
+// after a GL context is made current and before any GL call. On Apple the
+// system framework provides the entry points directly, so this is a no-op; on
+// other platforms it runs glewInit(). Returns true on success. Keeping the
+// platform-specific logic here means every GL context (the engine's and the
+// tests') initializes the loader the same way.
+bool okInitGlLoader();
 
 #endif  // OK_GL_CONFIG_HPP
