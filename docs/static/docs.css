@@ -1,1 +1,346 @@
-/* Placeholder. Replaced by the impeccable design in a later task. */
+/* ==========================================================================
+   okinawa engine — documentation site
+   Aesthetic: sumi-e. Warm washi paper, ink text, a single magenta koi accent.
+   Light theme: long-form reading + dense code, in daylight.
+   ========================================================================== */
+
+:root {
+  /* Paper & ink (neutrals tinted warm, toward washi). Never pure #000/#fff. */
+  --paper:        oklch(0.989 0.006 80);   /* page background */
+  --paper-raised: oklch(0.972 0.008 80);   /* sidebar, code panels */
+  --paper-sunken: oklch(0.945 0.010 78);   /* inline code, table head */
+  --ink:          oklch(0.275 0.018 330);  /* body text, faint magenta cast */
+  --ink-soft:     oklch(0.455 0.020 330);  /* secondary text */
+  --ink-faint:    oklch(0.605 0.018 330);  /* captions, labels */
+  --rule:         oklch(0.905 0.010 78);   /* hairlines */
+  --rule-strong:  oklch(0.855 0.012 78);
+
+  /* The koi: a single committed accent (kept under ~10% of the surface). */
+  --koi:          oklch(0.605 0.207 5);
+  --koi-deep:     oklch(0.515 0.196 6);    /* hover / pressed */
+  --koi-wash:     oklch(0.955 0.030 5);    /* tint behind active items */
+
+  --measure: 72ch;                          /* article line length */
+  --sidebar-w: 16.5rem;
+  --topbar-h: 3.75rem;
+
+  --radius: 7px;
+  --radius-sm: 4px;
+
+  --font-serif: "Hoefler Text", "Iowan Old Style", "Palatino Linotype",
+                Palatino, Georgia, "Times New Roman", serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+               Arial, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo,
+               Consolas, "Liberation Mono", monospace;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* --- reset ---------------------------------------------------------------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+img { max-width: 100%; height: auto; }
+a { color: var(--koi-deep); text-decoration: none; }
+
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: -3rem;
+  z-index: 20;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.85rem;
+  transition: top 0.18s var(--ease-out);
+}
+.skip-link:focus { top: 0.75rem; }
+
+/* --- top bar -------------------------------------------------------------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 1.5rem;
+  background: color-mix(in oklch, var(--paper) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ink);
+}
+.brand-mark { width: 30px; height: 30px; display: block; }
+.brand-word {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+.brand-word small {
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.gh-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+.gh-link:hover { color: var(--ink); background: var(--paper-sunken); }
+
+/* --- layout shell --------------------------------------------------------- */
+
+.layout {
+  max-width: 86rem;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: var(--topbar-h);
+  height: calc(100vh - var(--topbar-h));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2rem 1.25rem 3rem 1.5rem;
+  border-right: 1px solid var(--rule);
+}
+
+/* --- sidebar nav (markup emitted by the generator) ----------------------- */
+
+.nav .nav-section {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 1.6rem 0 0.55rem 0.2rem;
+}
+.nav .nav-section:first-child { margin-top: 0; }
+
+.nav ul { list-style: none; margin: 0 0 0.2rem; padding: 0; }
+.nav li { margin: 0.05rem 0; }
+
+.nav a {
+  display: block;
+  position: relative;
+  padding: 0.32rem 0.6rem;
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  font-size: 0.945rem;
+  line-height: 1.4;
+  transition: color 0.14s var(--ease-out), background 0.14s var(--ease-out);
+}
+.nav a:hover { color: var(--ink); background: var(--paper-sunken); }
+.nav a.active {
+  color: var(--koi-deep);
+  background: var(--koi-wash);
+  font-weight: 600;
+}
+/* The brush dot: a small ink mark on the active leaf, not a side stripe. */
+.nav a.active::before {
+  content: "";
+  position: absolute;
+  left: -0.55rem;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--koi);
+}
+
+/* --- content column ------------------------------------------------------- */
+
+.content {
+  min-width: 0;
+  padding: 2.75rem clamp(1.25rem, 4vw, 3.5rem) 4rem;
+}
+.prose { max-width: var(--measure); }
+
+/* headings: serif display, clear scale (>=1.25 between steps) */
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  line-height: 1.18;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.prose h1 {
+  font-size: 2.55rem;
+  margin: 0 0 0.4rem;
+  letter-spacing: -0.015em;
+}
+/* A short ink underline beneath the page title. */
+.prose h1::after {
+  content: "";
+  display: block;
+  width: 2.6rem;
+  height: 3px;
+  margin-top: 0.85rem;
+  border-radius: 2px;
+  background: var(--koi);
+}
+.prose h2 {
+  font-size: 1.7rem;
+  margin: 2.8rem 0 0.9rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--rule);
+}
+.prose h3 { font-size: 1.28rem; margin: 2rem 0 0.6rem; }
+.prose h4 {
+  font-size: 1.02rem;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  margin: 1.6rem 0 0.5rem;
+}
+
+.prose p { margin: 0 0 1.1rem; }
+.prose a { text-decoration: underline; text-decoration-color: var(--rule-strong); text-underline-offset: 0.18em; transition: text-decoration-color 0.15s var(--ease-out); }
+.prose a:hover { text-decoration-color: var(--koi); }
+
+.prose ul, .prose ol { margin: 0 0 1.1rem; padding-left: 1.4rem; }
+.prose li { margin: 0.3rem 0; }
+.prose li::marker { color: var(--koi); }
+
+.prose hr { border: 0; border-top: 1px solid var(--rule); margin: 2.5rem 0; }
+
+/* blockquote: indent + paper-sunken tint + ink mark. No side stripe. */
+.prose blockquote {
+  margin: 1.4rem 0;
+  padding: 0.9rem 1.2rem;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+  font-style: italic;
+}
+.prose blockquote p:last-child { margin-bottom: 0; }
+
+/* --- code ----------------------------------------------------------------- */
+
+.prose :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--paper-sunken);
+  color: var(--ink);
+  padding: 0.12em 0.4em;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+}
+
+.prose pre {
+  margin: 1.4rem 0;
+  padding: 1.05rem 1.25rem;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  overflow-x: auto;
+  line-height: 1.6;
+  -webkit-overflow-scrolling: touch;
+}
+.prose pre code {
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+/* --- tables --------------------------------------------------------------- */
+
+.prose table {
+  width: 100%;
+  margin: 1.5rem 0;
+  border-collapse: collapse;
+  font-size: 0.94rem;
+}
+.prose th, .prose td {
+  text-align: left;
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+.prose thead th {
+  background: var(--paper-sunken);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--rule-strong);
+}
+.prose tbody tr:last-child td { border-bottom: 0; }
+.prose tbody tr:hover td { background: color-mix(in oklch, var(--koi-wash) 55%, transparent); }
+.prose td code { white-space: nowrap; }
+
+/* --- page footer ---------------------------------------------------------- */
+
+.page-foot {
+  max-width: var(--measure);
+  margin-top: 3.5rem;
+  padding-top: 1.3rem;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-faint);
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+}
+
+/* --- responsive ----------------------------------------------------------- */
+
+@media (max-width: 56rem) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+    padding: 1.1rem 1.5rem 1.4rem;
+  }
+  .nav .nav-section { margin-top: 1.1rem; }
+  .nav a.active::before { display: none; }
+  .content { padding-top: 2rem; }
+  .prose h1 { font-size: 2.1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; }
+}
