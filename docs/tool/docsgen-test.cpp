@@ -87,3 +87,36 @@ TEST_CASE("buildNav groups, orders, excludes home, marks active", "[docs]") {
   // Links are root-relative.
   REQUIRE(nav.find("href=\"/getting-started.html\"") != std::string::npos);
 }
+
+TEST_CASE("applyBaseUrl prefixes only root-relative urls", "[docs]") {
+  std::string in =
+      "<a href=\"/getting-started.html\">x</a>"
+      "<img src=\"/static/logo.png\">"
+      "<a href=\"#anchor\">y</a>"
+      "<a href=\"https://x.test/p\">z</a>"
+      "<a href=\"//cdn.test/a\">w</a>";
+  std::string out = docsgen::applyBaseUrl(in, "/okinawa.cpp");
+  REQUIRE(out.find("href=\"/okinawa.cpp/getting-started.html\"") !=
+          std::string::npos);
+  REQUIRE(out.find("src=\"/okinawa.cpp/static/logo.png\"") !=
+          std::string::npos);
+  REQUIRE(out.find("href=\"#anchor\"") != std::string::npos);
+  REQUIRE(out.find("href=\"https://x.test/p\"") != std::string::npos);
+  REQUIRE(out.find("href=\"//cdn.test/a\"") != std::string::npos);
+}
+
+TEST_CASE("applyBaseUrl with empty base is a no-op", "[docs]") {
+  std::string in = "<a href=\"/x.html\">x</a>";
+  REQUIRE(docsgen::applyBaseUrl(in, "") == in);
+}
+
+TEST_CASE("renderTemplate fills all placeholders", "[docs]") {
+  std::string tmpl =
+      "<title>{{title}}</title><nav>{{nav}}</nav><main>{{content}}</main>"
+      "<link href=\"{{base_url}}/static/docs.css\">";
+  std::string out = docsgen::renderTemplate(tmpl, "Items", "<ul></ul>", "<p>x</p>",
+                                            "/okinawa.cpp");
+  REQUIRE(out ==
+          "<title>Items</title><nav><ul></ul></nav><main><p>x</p></main>"
+          "<link href=\"/okinawa.cpp/static/docs.css\">");
+}

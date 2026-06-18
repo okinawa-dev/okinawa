@@ -43,6 +43,42 @@ bool pageLess(const docsgen::Page &a, const docsgen::Page &b) {
   return a.title < b.title;
 }
 
+std::string replaceAll(std::string s, const std::string &from,
+                       const std::string &to) {
+  if (from.empty()) return s;
+  std::size_t pos = 0;
+  while ((pos = s.find(from, pos)) != std::string::npos) {
+    s.replace(pos, from.size(), to);
+    pos += to.size();
+  }
+  return s;
+}
+
+// Insert baseUrl before the leading '/' of every `token + "/..."` whose value
+// is root-relative (single leading slash, not "//").
+std::string prefixRootRel(const std::string &html, const std::string &token,
+                          const std::string &baseUrl) {
+  std::string out;
+  out.reserve(html.size() + 64);
+  std::size_t i = 0;
+  while (i < html.size()) {
+    std::size_t hit = html.find(token, i);
+    if (hit == std::string::npos) {
+      out += html.substr(i);
+      break;
+    }
+    out += html.substr(i, hit - i);
+    out += token;
+    std::size_t after = hit + token.size();
+    if (after < html.size() && html[after] == '/' &&
+        !(after + 1 < html.size() && html[after + 1] == '/')) {
+      out += baseUrl;
+    }
+    i = after;
+  }
+  return out;
+}
+
 }  // namespace
 
 namespace docsgen {
@@ -146,18 +182,21 @@ std::string buildNav(const std::vector<Page> &pages,
 }
 
 std::string applyBaseUrl(const std::string &html, const std::string &baseUrl) {
-  (void)baseUrl;
-  return html;
+  if (baseUrl.empty()) return html;
+  std::string out = prefixRootRel(html, "href=\"", baseUrl);
+  out = prefixRootRel(out, "src=\"", baseUrl);
+  return out;
 }
 
 std::string renderTemplate(const std::string &tmpl, const std::string &title,
                            const std::string &nav, const std::string &content,
                            const std::string &baseUrl) {
-  (void)title;
-  (void)nav;
-  (void)content;
-  (void)baseUrl;
-  return tmpl;
+  std::string out = tmpl;
+  out = replaceAll(out, "{{title}}", title);
+  out = replaceAll(out, "{{nav}}", nav);
+  out = replaceAll(out, "{{content}}", content);
+  out = replaceAll(out, "{{base_url}}", baseUrl);
+  return out;
 }
 
 std::string renderMarkdown(const std::string &markdown) { return markdown; }
