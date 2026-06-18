@@ -9,6 +9,7 @@
 #include "handlers/scenes.hpp"
 #include "math/rotation.hpp"
 #include "scene/scene.hpp"
+#include "../mcp/mcp-config.hpp"  // resolves OKINAWA_WITH_MCP (NDEBUG / force)
 #ifdef OKINAWA_WITH_MCP
 #include "../mcp/mcp-server.hpp"
 #endif

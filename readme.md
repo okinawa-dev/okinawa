@@ -64,6 +64,37 @@ xmake build okinawa_test  # just the tests
 xmake f -m release && xmake
 ```
 
+### In-engine MCP server (build option)
+
+The engine ships an optional in-process **MCP server** (`src/okinawa/mcp/`):
+when enabled, a running okinawa app exposes tools over local HTTP
+(`127.0.0.1:8765/mcp`) so an external agent (e.g. Claude Code) can view the
+rendered frame, inject input and read telemetry. The app opts in at runtime by
+calling `OkCore::enableMcpServer()`.
+
+Whether the server is *compiled in* is a build-time choice with a
+**mode-dependent default — included in debug, excluded in release**. The
+decision is made by the compiler from `NDEBUG` (in `mcp-config.hpp`), so it
+works the same when okinawa is built standalone or consumed through another
+project's `includes()`. Override the default with at most one option:
+
+```bash
+xmake f --mcp=y      # force the server IN  (defines OKINAWA_MCP_FORCE=1)
+xmake f --no-mcp=y   # force the server OUT (defines OKINAWA_MCP_FORCE=0)
+```
+
+When excluded, `mcp-server.cpp` is an empty translation unit, so no MCP/HTTP
+code (nor its header-only deps `cpp-httplib` / `nlohmann_json`) ends up in the
+binary, and `enableMcpServer()` becomes a no-op that logs a warning.
+
+> Why not a plain mode-dependent `set_default`? xmake cannot read the build
+> mode at a phase that also propagates through `includes()` to consumers
+> (`is_mode()`/`get_config("mode")` are nil at script-load scope; a per-target
+> `on_config` does not run for an included sub-target; and an option's dynamic
+> `on_check` defines do not propagate). Letting the compiler decide via
+> `NDEBUG`, with the override carried by *static* option defines, is the robust
+> path. See the okinawa MCP ADR for the full rationale.
+
 ## Consuming the engine
 
 The engine is consumed from source by other xmake projects (for example
@@ -115,3 +146,5 @@ clang-tidy -p . src/**/*.cpp
 - [glm](https://github.com/g-truc/glm): OpenGL Mathematics (GLM), is a header only C++ mathematics library for graphics software.
 - [stb-image](https://github.com/nothings/stb): Single-file public domain image loading library.
 - [Catch2](https://github.com/catchorg/Catch2): A modern, C++-native, header-only, test framework for unit-tests, TDD and BDD.
+- [cpp-httplib](https://github.com/yhirose/cpp-httplib): Header-only HTTP server, used by the optional in-engine MCP server (only when compiled in).
+- [nlohmann/json](https://github.com/nlohmann/json): Header-only JSON library, used by the MCP server (only when compiled in).
