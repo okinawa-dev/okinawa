@@ -32,15 +32,20 @@ Most 3D engines use a right-handed coordinate system, where:
   - Positive roll rotates clockwise when looking along view direction
 
 ### Vector Relations
-- Forward Vector = (sin(yaw)cos(pitch), sin(pitch), cos(yaw)cos(pitch))
+- Forward Vector = (-sin(yaw)cos(pitch), sin(pitch), -cos(yaw)cos(pitch))
 - Right Vector = (cos(yaw), 0, -sin(yaw))
 - Up Vector = Cross product of Right and Forward
 
+The negative X and Z in the forward vector are what make the default
+orientation (yaw = pitch = 0) look down -Z, matching the camera convention
+above.
+
 ### Important Rules
-1. Right × Forward = Down (right-hand rule)
-2. Forward × Right = Up
-3. Up × Forward = Right
-4. Right × Up = Forward
+The world axes are right-handed: X × Y = Z. The direction vectors are
+mutually consistent with `getUpVector`, which computes Up = Right × Forward:
+1. Up = Right × Forward
+2. Right = Forward × Up
+3. Forward = Up × Right
 
 ### Common Operations
 - Looking left: Positive yaw

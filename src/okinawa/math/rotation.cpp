@@ -187,7 +187,8 @@ std::string OkRotation::toString() const {
  * @note The forward vector is calculated using the angles of the rotation.
  */
 OkPoint OkRotation::getForwardVector() const {
-  // Forward vector = (sin(yaw)cos(pitch), sin(pitch), cos(yaw)cos(pitch))
+  // Forward vector = (-sin(yaw)cos(pitch), sin(pitch), -cos(yaw)cos(pitch))
+  // (negative X and Z so the default orientation, yaw=pitch=0, looks down -Z)
   float pitch = angles.x;
   float yaw   = angles.y;
   float cp    = std::cos(pitch);
