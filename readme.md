@@ -1,8 +1,8 @@
 <p align="center">
-  <img width="200" alt="okinawa.cpp logo" src="/assets/project/okinawa_logo.png">
+  <img width="200" alt="okinawa logo" src="/assets/project/okinawa_logo.png">
 </p>
 
-# okinawa.cpp
+# okinawa
 
 This is a work in progress C++ 3D game engine, inspired by [okinawa.js](https://github.com/okinawa-dev/okinawa.js), a previous version coded in JavaScript. The goal is to create a game engine that is easy to use, flexible, and powerful. The engine is designed to be modular, so you can easily add or remove features as needed.
 

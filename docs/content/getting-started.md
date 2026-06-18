@@ -13,7 +13,7 @@ Not using xmake? See [Other build systems](/other-build-systems.html) for consum
 ## Add the engine as a submodule
 
 ```bash
-git submodule add https://github.com/okinawa-dev/okinawa.cpp okinawa.cpp
+git submodule add https://github.com/okinawa-dev/okinawa okinawa
 git submodule update --init
 ```
 
@@ -22,7 +22,7 @@ git submodule update --init
 In your project's `xmake.lua`, include the submodule and depend on the `okinawa` target:
 
 ```lua
-includes("okinawa.cpp")
+includes("okinawa")
 
 target("myapp")
     set_kind("binary")
@@ -30,7 +30,7 @@ target("myapp")
     add_files("src/*.cpp")
 ```
 
-`includes("okinawa.cpp")` pulls the engine target into your build tree, so editing the engine and rebuilding your app picks the changes up directly (no binary package step).
+`includes("okinawa")` pulls the engine target into your build tree, so editing the engine and rebuilding your app picks the changes up directly (no binary package step).
 
 ## Open a window and render something
 

@@ -1,4 +1,4 @@
--- okinawa.cpp - xmake build
+-- okinawa - xmake build
 --
 -- Build:        xmake
 -- Run tests:    xmake run okinawa_test   (or: xmake test)

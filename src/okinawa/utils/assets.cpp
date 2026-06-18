@@ -60,11 +60,11 @@ bool OkAssets::discoverEngineAssetRoot() {
       return true;
     }
 
-    // Also check for okinawa.cpp specific structure
-    candidate = currentPath / "okinawa.cpp" / "assets" / "shaders";
+    // Also check for okinawa specific structure
+    candidate = currentPath / "okinawa" / "assets" / "shaders";
     if (std::filesystem::exists(candidate) &&
         std::filesystem::is_directory(candidate)) {
-      getMutableEngineRoot() = currentPath / "okinawa.cpp";
+      getMutableEngineRoot() = currentPath / "okinawa";
       return true;
     }
 

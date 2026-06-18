@@ -95,10 +95,10 @@ TEST_CASE("applyBaseUrl prefixes only root-relative urls", "[docs]") {
       "<a href=\"#anchor\">y</a>"
       "<a href=\"https://x.test/p\">z</a>"
       "<a href=\"//cdn.test/a\">w</a>";
-  std::string out = docsgen::applyBaseUrl(in, "/okinawa.cpp");
-  REQUIRE(out.find("href=\"/okinawa.cpp/getting-started.html\"") !=
+  std::string out = docsgen::applyBaseUrl(in, "/okinawa");
+  REQUIRE(out.find("href=\"/okinawa/getting-started.html\"") !=
           std::string::npos);
-  REQUIRE(out.find("src=\"/okinawa.cpp/static/logo.png\"") !=
+  REQUIRE(out.find("src=\"/okinawa/static/logo.png\"") !=
           std::string::npos);
   REQUIRE(out.find("href=\"#anchor\"") != std::string::npos);
   REQUIRE(out.find("href=\"https://x.test/p\"") != std::string::npos);
@@ -115,10 +115,10 @@ TEST_CASE("renderTemplate fills all placeholders", "[docs]") {
       "<title>{{title}}</title><nav>{{nav}}</nav><main>{{content}}</main>"
       "<link href=\"{{base_url}}/static/docs.css\">";
   std::string out = docsgen::renderTemplate(tmpl, "Items", "<ul></ul>", "<p>x</p>",
-                                            "/okinawa.cpp");
+                                            "/okinawa");
   REQUIRE(out ==
           "<title>Items</title><nav><ul></ul></nav><main><p>x</p></main>"
-          "<link href=\"/okinawa.cpp/static/docs.css\">");
+          "<link href=\"/okinawa/static/docs.css\">");
 }
 
 TEST_CASE("renderMarkdown emits html, including GFM tables", "[docs]") {

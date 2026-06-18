@@ -45,14 +45,14 @@ build. This is the lowest-friction path, because xmake still fetches and builds
 the dependencies for you.
 
 ```bash
-git submodule add https://github.com/okinawa-dev/okinawa.cpp okinawa.cpp
-xmake build -P okinawa.cpp -y okinawa
+git submodule add https://github.com/okinawa-dev/okinawa okinawa
+xmake build -P okinawa -y okinawa
 ```
 
-That produces `okinawa.cpp/build/<plat>/<arch>/<mode>/libokinawa.a`, for example
-`okinawa.cpp/build/linux/x86_64/release/libokinawa.a`. In your own build:
+That produces `okinawa/build/<plat>/<arch>/<mode>/libokinawa.a`, for example
+`okinawa/build/linux/x86_64/release/libokinawa.a`. In your own build:
 
-- add `okinawa.cpp/src` to the include path,
+- add `okinawa/src` to the include path,
 - link that `libokinawa.a`,
 - link GLFW, OpenGL, and GLEW (off macOS); on macOS add the frameworks above,
 - on Linux and Windows, call `glewInit()` once a GL context is current, or go
@@ -62,8 +62,8 @@ That produces `okinawa.cpp/build/<plat>/<arch>/<mode>/libokinawa.a`, for example
 
 If you do not want xmake at all, add the engine sources to your own build:
 
-- compile `okinawa.cpp/src/**.cpp`,
-- add both `okinawa.cpp/src` and `okinawa.cpp/src/okinawa` to the include path
+- compile `okinawa/src/**.cpp`,
+- add both `okinawa/src` and `okinawa/src/okinawa` to the include path
   (the second resolves the engine's internal, unprefixed includes),
 - provide GLM, STB, GLFW, GLEW, and OpenGL yourself,
 - add the macOS frameworks on macOS.
@@ -84,8 +84,8 @@ As a shortcut, xmake can emit build files for other systems from the engine's
 project:
 
 ```bash
-xmake project -P okinawa.cpp -k cmake      # CMakeLists.txt
-xmake project -P okinawa.cpp -k makefile   # Makefile
+xmake project -P okinawa -k cmake      # CMakeLists.txt
+xmake project -P okinawa -k makefile   # Makefile
 ```
 
 These still expect the dependencies to be resolvable, but they can be a useful
