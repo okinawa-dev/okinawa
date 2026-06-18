@@ -4,7 +4,7 @@ section: Examples
 nav_order: 2
 ---
 
-# Building a texture-preview overlay
+# Texture viewer
 
 This tutorial builds a small on-screen overlay that displays a texture and cycles through the available textures with a key press. The idea is general: parent a flat, textured quad to the camera so it stays fixed on screen, then swap its texture on demand. The technique is used by the wadviewer app to preview WAD textures, but nothing here is WAD-specific.
 

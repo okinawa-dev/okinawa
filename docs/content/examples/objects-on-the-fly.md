@@ -4,7 +4,7 @@ section: Examples
 nav_order: 1
 ---
 
-# Creating objects on the fly
+# Objects on the fly
 
 This tutorial creates two `OkItem` cubes at runtime, parents one to the other with `attachTo`, and rotates the parent every frame from the step callback. Because the second cube is a child, it inherits the parent's rotation: spin the parent and the child orbits with it. See [Items](/reference/items.html) for the full transform API.
 
