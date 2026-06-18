@@ -1,5 +1,6 @@
 #include "docsgen.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 
 namespace {
@@ -11,6 +12,35 @@ std::string trim(const std::string &s) {
   while (b > a && (s[b - 1] == ' ' || s[b - 1] == '\t' || s[b - 1] == '\r'))
     b--;
   return s.substr(a, b - a);
+}
+
+std::string htmlEscape(const std::string &s) {
+  std::string out;
+  out.reserve(s.size());
+  for (std::size_t i = 0; i < s.size(); i++) {
+    char c = s[i];
+    if (c == '&') {
+      out += "&amp;";
+    } else if (c == '<') {
+      out += "&lt;";
+    } else if (c == '>') {
+      out += "&gt;";
+    } else if (c == '"') {
+      out += "&quot;";
+    } else {
+      out += c;
+    }
+  }
+  return out;
+}
+
+bool pageLess(const docsgen::Page &a, const docsgen::Page &b) {
+  int ra = docsgen::sectionRank(a.section);
+  int rb = docsgen::sectionRank(b.section);
+  if (ra != rb) return ra < rb;
+  if (a.section != b.section) return a.section < b.section;
+  if (a.navOrder != b.navOrder) return a.navOrder < b.navOrder;
+  return a.title < b.title;
 }
 
 }  // namespace
@@ -87,9 +117,32 @@ int sectionRank(const std::string &section) {
 
 std::string buildNav(const std::vector<Page> &pages,
                      const std::string &currentOutPath) {
-  (void)pages;
-  (void)currentOutPath;
-  return "";
+  std::vector<Page> items;
+  for (std::size_t i = 0; i < pages.size(); i++) {
+    if (pages[i].outRelPath == "index.html") continue;
+    items.push_back(pages[i]);
+  }
+  std::stable_sort(items.begin(), items.end(), pageLess);
+
+  std::string html;
+  std::string currentSection;
+  bool open = false;
+  for (std::size_t i = 0; i < items.size(); i++) {
+    const Page &p = items[i];
+    if (i == 0 || p.section != currentSection) {
+      if (open) html += "</ul>\n";
+      currentSection = p.section;
+      html += "<div class=\"nav-section\">" + htmlEscape(p.section) +
+              "</div>\n<ul>\n";
+      open = true;
+    }
+    std::string cls =
+        (p.outRelPath == currentOutPath) ? " class=\"active\"" : "";
+    html += "<li><a href=\"/" + p.outRelPath + "\"" + cls + ">" +
+            htmlEscape(p.title) + "</a></li>\n";
+  }
+  if (open) html += "</ul>\n";
+  return html;
 }
 
 std::string applyBaseUrl(const std::string &html, const std::string &baseUrl) {

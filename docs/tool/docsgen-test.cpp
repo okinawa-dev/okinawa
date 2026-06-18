@@ -54,3 +54,36 @@ TEST_CASE("sectionRank orders known sections first", "[docs]") {
   REQUIRE(docsgen::sectionRank("Reference") < docsgen::sectionRank("Examples"));
   REQUIRE(docsgen::sectionRank("Examples") < docsgen::sectionRank("Misc"));
 }
+
+static docsgen::Page mkPage(const std::string &out, const std::string &title,
+                            const std::string &section, int navOrder) {
+  docsgen::Page p;
+  p.outRelPath = out;
+  p.title = title;
+  p.section = section;
+  p.navOrder = navOrder;
+  p.hasNavOrder = true;
+  return p;
+}
+
+TEST_CASE("buildNav groups, orders, excludes home, marks active", "[docs]") {
+  std::vector<docsgen::Page> pages;
+  pages.push_back(mkPage("index.html", "Home", "", 0));
+  pages.push_back(mkPage("reference/items.html", "Items", "Reference", 2));
+  pages.push_back(mkPage("getting-started.html", "Getting started", "Start", 1));
+  pages.push_back(mkPage("reference/core.html", "Core", "Reference", 1));
+
+  std::string nav = docsgen::buildNav(pages, "reference/items.html");
+
+  // Home is excluded.
+  REQUIRE(nav.find("Home") == std::string::npos);
+  // Start section appears before Reference section.
+  REQUIRE(nav.find("Start") < nav.find("Reference"));
+  // Within Reference, Core (nav_order 1) precedes Items (nav_order 2).
+  REQUIRE(nav.find(">Core<") < nav.find(">Items<"));
+  // The current page is marked active.
+  REQUIRE(nav.find("href=\"/reference/items.html\" class=\"active\"") !=
+          std::string::npos);
+  // Links are root-relative.
+  REQUIRE(nav.find("href=\"/getting-started.html\"") != std::string::npos);
+}
