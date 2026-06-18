@@ -65,3 +65,6 @@ tests/okinawa*
 
 # claude
 .claude/
+
+# docs site (generated)
+docs/dist/

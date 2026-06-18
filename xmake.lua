@@ -41,6 +41,7 @@ add_requires("glfw")
 add_requires("stb")
 add_requires("opengl")
 add_requires("catch2")              -- only used by the test target
+add_requires("md4c")                -- Markdown->HTML for the docs site generator
 add_requires("cpp-httplib")         -- MCP server (header-only)
 add_requires("nlohmann_json")       -- MCP server (header-only)
 
@@ -83,6 +84,26 @@ target("okinawa_test")
     -- Tests read data files by project-relative paths (e.g. tests/test-file.txt).
     set_rundir("$(projectdir)")
     add_tests("default")
+
+-- =========================================================================
+-- Documentation site generator (docs/tool). Standalone: does NOT link the
+-- engine. Built explicitly with `xmake build okinawa-docs`; a bare `xmake`
+-- skips it (set_default false). Run from the project root so docs/ resolves.
+-- =========================================================================
+target("okinawa-docs")
+    set_kind("binary")
+    set_default(false)
+    add_files("docs/tool/main.cpp", "docs/tool/docsgen.cpp")
+    add_packages("md4c")
+    set_rundir("$(projectdir)")
+
+target("okinawa-docs-tests")
+    set_kind("binary")
+    set_default(false)
+    add_files("docs/tool/docsgen-test.cpp", "docs/tool/docsgen.cpp")
+    add_packages("catch2", "md4c")
+    set_rundir("$(projectdir)")
+    add_tests("docs")
 
 -- =========================================================================
 -- Coverage task: llvm source-based coverage over the test run.
