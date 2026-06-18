@@ -36,5 +36,18 @@
       </footer>
     </main>
   </div>
+
+  <!-- Syntax highlighting: vendored highlight.js (core + cpp/bash/lua only),
+       self-hosted so the site stays offline-capable and base-url aware. -->
+  <script type="module">
+    import hljs from "{{base_url}}/static/hljs/core.min.js";
+    import cpp from "{{base_url}}/static/hljs/cpp.min.js";
+    import bash from "{{base_url}}/static/hljs/bash.min.js";
+    import lua from "{{base_url}}/static/hljs/lua.min.js";
+    hljs.registerLanguage("cpp", cpp);
+    hljs.registerLanguage("bash", bash);
+    hljs.registerLanguage("lua", lua);
+    hljs.highlightAll();
+  </script>
 </body>
 </html>
