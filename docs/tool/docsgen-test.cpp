@@ -40,3 +40,17 @@ TEST_CASE("parseFrontMatter tolerates CRLF and missing nav_order", "[docs]") {
   REQUIRE_FALSE(fm.hasNavOrder);
   REQUIRE(body == "Hello\r\n");
 }
+
+TEST_CASE("outputPathFor swaps .md for .html", "[docs]") {
+  REQUIRE(docsgen::outputPathFor("index.md") == "index.html");
+  REQUIRE(docsgen::outputPathFor("reference/items.md") ==
+          "reference/items.html");
+  REQUIRE(docsgen::outputPathFor("examples/texture-viewer.md") ==
+          "examples/texture-viewer.html");
+}
+
+TEST_CASE("sectionRank orders known sections first", "[docs]") {
+  REQUIRE(docsgen::sectionRank("Start") < docsgen::sectionRank("Reference"));
+  REQUIRE(docsgen::sectionRank("Reference") < docsgen::sectionRank("Examples"));
+  REQUIRE(docsgen::sectionRank("Examples") < docsgen::sectionRank("Misc"));
+}

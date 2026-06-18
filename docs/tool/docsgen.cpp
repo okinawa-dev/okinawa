@@ -68,10 +68,20 @@ bool parseFrontMatter(const std::string &content, FrontMatter &fmOut,
   return false;
 }
 
-std::string outputPathFor(const std::string &srcRelPath) { return srcRelPath; }
+std::string outputPathFor(const std::string &srcRelPath) {
+  const std::string ext = ".md";
+  if (srcRelPath.size() >= ext.size() &&
+      srcRelPath.compare(srcRelPath.size() - ext.size(), ext.size(), ext) ==
+          0) {
+    return srcRelPath.substr(0, srcRelPath.size() - ext.size()) + ".html";
+  }
+  return srcRelPath;
+}
 
 int sectionRank(const std::string &section) {
-  (void)section;
+  if (section == "Start") return 0;
+  if (section == "Reference") return 1;
+  if (section == "Examples") return 2;
   return 1000;
 }
 
