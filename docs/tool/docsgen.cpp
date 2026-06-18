@@ -1,11 +1,70 @@
 #include "docsgen.hpp"
 
+#include <cstdlib>
+
+namespace {
+
+std::string trim(const std::string &s) {
+  std::size_t a = 0;
+  std::size_t b = s.size();
+  while (a < b && (s[a] == ' ' || s[a] == '\t')) a++;
+  while (b > a && (s[b - 1] == ' ' || s[b - 1] == '\t' || s[b - 1] == '\r'))
+    b--;
+  return s.substr(a, b - a);
+}
+
+}  // namespace
+
 namespace docsgen {
 
 bool parseFrontMatter(const std::string &content, FrontMatter &fmOut,
                       std::string &bodyOut) {
-  (void)fmOut;
-  bodyOut = content;
+  fmOut = FrontMatter();
+  fmOut.navOrder = 0;
+  fmOut.hasNavOrder = false;
+
+  std::size_t pos = 0;
+  if (content.compare(0, 3, "\xEF\xBB\xBF") == 0) pos = 3;  // skip BOM
+
+  std::size_t firstNl = content.find('\n', pos);
+  if (firstNl == std::string::npos) {
+    bodyOut = content;
+    return false;
+  }
+  std::string firstLine = trim(content.substr(pos, firstNl - pos));
+  if (firstLine != "---") {
+    bodyOut = content;
+    return false;
+  }
+
+  std::size_t lineStart = firstNl + 1;
+  while (lineStart <= content.size()) {
+    std::size_t nl = content.find('\n', lineStart);
+    std::string line = (nl == std::string::npos)
+                           ? content.substr(lineStart)
+                           : content.substr(lineStart, nl - lineStart);
+    if (trim(line) == "---") {
+      bodyOut = (nl == std::string::npos) ? "" : content.substr(nl + 1);
+      return true;
+    }
+    std::size_t colon = line.find(':');
+    if (colon != std::string::npos) {
+      std::string key = trim(line.substr(0, colon));
+      std::string val = trim(line.substr(colon + 1));
+      if (key == "title") {
+        fmOut.title = val;
+      } else if (key == "section") {
+        fmOut.section = val;
+      } else if (key == "nav_order") {
+        fmOut.navOrder = std::atoi(val.c_str());
+        fmOut.hasNavOrder = true;
+      }
+    }
+    if (nl == std::string::npos) break;
+    lineStart = nl + 1;
+  }
+
+  bodyOut = content;  // no closing delimiter -> not a valid block
   return false;
 }
 
