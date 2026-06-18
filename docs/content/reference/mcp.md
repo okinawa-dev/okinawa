@@ -6,7 +6,21 @@ nav_order: 8
 
 # MCP server
 
-Okinawa ships an optional in-engine MCP (Model Context Protocol) server. It lets an external agent connect to a running app over local HTTP and observe or drive it through MCP tools (v1: `view_frame`, which returns the rendered frame as an image). The public surface (`OkMcpServer`) deliberately exposes no HTTP or JSON types: all of that lives behind a pimpl, so consumers do not inherit those dependencies.
+Okinawa ships an optional in-engine MCP (Model Context Protocol) server. It lets an external agent connect to a running app over local HTTP and observe or drive it through the tools listed below. The public surface (`OkMcpServer`) deliberately exposes no HTTP or JSON types: all of that lives behind a pimpl, so consumers do not inherit those dependencies.
+
+## Tools
+
+The server exposes these tools to a connected agent:
+
+| Tool | What it does |
+| --- | --- |
+| `view_frame` | Returns the current rendered frame as a PNG image, so the agent can see what is on screen. |
+| `screenshot` | Writes the current frame to a PNG file on disk (for a human) and returns the path. Optional `path` (default `okinawa-screenshot.png`). |
+| `press_key` | Holds a key for a duration to drive the app: W/A/S/D move, SPACE/T/R/F are actions, 1-9 switch camera, arrows turn. Args: `key`, `duration_ms` (default 120). Returns the resulting camera pose. |
+| `press_keys` | Holds several keys at once (e.g. W and D for diagonal movement). Args: `keys`, `duration_ms`. Returns the resulting camera pose. |
+| `look` | Rotates the active camera by `yaw_deg` / `pitch_deg` (the look / mouse-move equivalent). Returns the resulting camera pose. |
+| `set_camera_pose` | Teleports and orients the active camera directly (`x`, `y`, `z`, `pitch_deg`, `yaw_deg`, `roll_deg`); omitted fields keep their current value. Returns the resulting camera pose. |
+| `get_state` | Returns numeric runtime state: active camera pose, fps, scene object count, window size and resident memory. |
 
 ## Enabling it
 
