@@ -14,7 +14,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-deploy:
+  # Stage 1: build the engine and run its test suite. This is the gate.
+  # If it fails, the deploy job below never runs, so broken engine code
+  # does not publish documentation.
+  build:
+    name: Build engine and run tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # GLFW (pulled by the engine via xrepo) needs the X11/OpenGL dev
+      # headers to build; xvfb + the mesa software rasteriser give the
+      # test binary a headless GL context to run against.
+      - name: Install engine build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xorg-dev libgl1-mesa-dev libglu1-mesa-dev libgl1-mesa-dri xvfb
+
+      - name: Set up xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+
+      - name: Cache xmake packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.xmake
+          key: xmake-${{ runner.os }}-${{ hashFiles('xmake.lua') }}
+          restore-keys: |
+            xmake-${{ runner.os }}-
+
+      - name: Build the engine
+        run: xmake build -y okinawa
+
+      - name: Build the test suite
+        run: xmake build -y okinawa_test
+
+      - name: Run the test suite
+        run: xvfb-run -a xmake run okinawa_test
+
+  # Stage 2: build the docs generator and publish the site to Pages.
+  # Runs only after the build stage succeeds (needs: build).
+  deploy:
+    name: Build and deploy the docs site
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
