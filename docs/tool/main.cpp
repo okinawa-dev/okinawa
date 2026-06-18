@@ -88,6 +88,22 @@ int main(int argc, char **argv) {
 
   // Second pass: render each page (see the pipeline in the plan header).
   fs::path outRoot(outDir);
+
+  // Guard against a destructive --out. We are about to remove_all(outDir), so
+  // refuse paths that would wipe the repo, the cwd, the filesystem root, or the
+  // very inputs we read from.
+  fs::path outNorm = outRoot.lexically_normal();
+  std::string outStr = outNorm.generic_string();
+  if (outStr.empty() || outStr == "." || outStr == "/" || outStr == ".." ||
+      outNorm == fs::path(inDir).lexically_normal() ||
+      outNorm == fs::path(staticDir).lexically_normal()) {
+    std::fprintf(stderr,
+                 "okinawa-docs: refusing to use output dir '%s' (too broad or "
+                 "overlaps inputs)\n",
+                 outDir.c_str());
+    return 1;
+  }
+
   fs::remove_all(outRoot);
   for (std::size_t i = 0; i < pages.size(); i++) {
     const docsgen::Page &page = pages[i];
