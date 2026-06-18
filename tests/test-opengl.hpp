@@ -32,6 +32,18 @@ public:
       throw std::runtime_error("Failed to create GLFW window");
     }
     glfwMakeContextCurrent(window);
+
+#if !defined(__APPLE__)
+    // On non-Apple platforms the OpenGL entry points come from GLEW, which
+    // must be initialized once the context is current; otherwise GL calls
+    // (e.g. glCreateShader in the shader tests) dereference null pointers.
+    glewExperimental = GL_TRUE;
+    if (glewInit() != GLEW_OK) {
+      glfwDestroyWindow(window);
+      glfwTerminate();
+      throw std::runtime_error("Failed to initialize GLEW");
+    }
+#endif
   }
 
   ~TestGLFWContext() {

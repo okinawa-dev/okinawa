@@ -126,26 +126,33 @@ TEST_CASE("OkShader program creation error cases", "[shaders]") {
   }
 
   SECTION("Program linking failure with mismatched interface") {
-    const char *vertexWithoutOutput = R"(
+    // The vertex shader outputs `color` as a vec2 while the fragment shader
+    // reads it as a vec4. A varying matched by name but with mismatched types
+    // is a link error guaranteed by the GLSL spec on every conformant driver.
+    // (An entirely absent input is NOT portable: some drivers, e.g. Mesa, link
+    // it successfully and read undefined values, while others, e.g. Apple's GL,
+    // reject it.)
+    const char *vertexMismatched   = R"(
           #version 330 core
           layout (location = 0) in vec3 aPos;
+          out vec2 color;
           void main() {
               gl_Position = vec4(aPos, 1.0);
-              // No output variable
+              color = vec2(1.0, 0.0);
           }
       )";
 
-    const char *fragmentWithInput = R"(
+    const char *fragmentMismatched = R"(
           #version 330 core
-          in vec4 color;  // Input that doesn't exist in vertex shader
+          in vec4 color;  // Type does not match the vertex output (vec2)
           out vec4 FragColor;
           void main() {
-              FragColor = color;  // Using undefined input
+              FragColor = color;
           }
       )";
 
     GLuint program =
-        OkShader::createProgram(vertexWithoutOutput, fragmentWithInput);
+        OkShader::createProgram(vertexMismatched, fragmentMismatched);
     REQUIRE(program == 0);
   }
 }

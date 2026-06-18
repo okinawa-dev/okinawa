@@ -53,6 +53,12 @@ add_requires("glm")
 add_requires("glfw")
 add_requires("stb")
 add_requires("opengl")
+-- GLEW is the OpenGL function loader on non-Apple platforms; macOS uses the
+-- system OpenGL framework directly (see core/gl_config.hpp), so glew is only
+-- pulled in off macOS.
+if not is_plat("macosx") then
+    add_requires("glew")
+end
 add_requires("catch2")              -- only used by the test target
 add_requires("md4c")                -- Markdown->HTML for the docs site generator
 add_requires("cpp-httplib")         -- MCP server (header-only)
@@ -72,6 +78,10 @@ target("okinawa")
     add_includedirs("src/okinawa")             -- private: engine-internal includes
     add_includedirs("src", {public = true})    -- public: consumers use okinawa/ prefix
     add_packages("glm", "glfw", "stb", "opengl", {public = true})
+    -- GLEW loader off macOS (macOS links the OpenGL framework below instead).
+    if not is_plat("macosx") then
+        add_packages("glew", {public = true})
+    end
 
     -- In-engine MCP server: add_options applies the OKINAWA_MCP_FORCE define
     -- from whichever of --mcp / --no-mcp is set (neither -> NDEBUG default).
