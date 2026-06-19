@@ -1,5 +1,6 @@
 #include "core.hpp"
 #include "../avatar/avatar.hpp"
+#include "../avatar/camera_view.hpp"
 #include "../config/config.hpp"
 #include "../input/input.hpp"
 #include "../shaders/shaders.hpp"
@@ -394,6 +395,19 @@ void OkCore::mouseCallback(GLFWwindow *window, double xpos, double ypos) {
   const float sensitivity = 0.05f;
   xoffset *= sensitivity;
   yoffset *= sensitivity;
+
+  // If the active avatar's current view consumes the mouse (e.g. third-person
+  // orbit), hand the delta to it and let the view own the camera's pose. The
+  // top-down view ignores it; with no active avatar we fall through to the
+  // free-fly rotation below.
+  if (_activeAvatar != nullptr) {
+    OkCameraView *view =
+        _activeAvatar->viewForCamera(_cameras[_currentCamera]);
+    if (view != nullptr) {
+      view->handleMouse(xoffset, yoffset);
+      return;
+    }
+  }
 
   // Get current rotation from camera
   OkRotation currentRotation = _cameras[_currentCamera]->getRotation();

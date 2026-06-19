@@ -58,5 +58,36 @@ updated each frame right after input and before the camera step. With **no**
 active avatar (the default), input keeps the free-fly camera behaviour, so the
 camera works as a debug fly-through.
 
-The avatar's cameras (third-person, top-down) are views bound to it; see the
-camera rig.
+## Camera rig
+
+An avatar's cameras are **views** bound to it: each is an `OkCameraView` that
+repositions its camera relative to the avatar every frame. Register each view's
+camera with `OkCore::addCamera` so the **number keys** switch between them, and
+add the view to the avatar with `addView`. The active view also receives the
+mouse (others ignore it); with no active avatar the mouse drives the free-fly
+camera as before.
+
+```cpp
+OkCamera *cam1 = new OkCamera("third-person", w, h);
+OkCamera *cam2 = new OkCamera("top-down", w, h);
+OkCore::addCamera(cam1);   // key 1
+OkCore::addCamera(cam2);   // key 2
+
+OkThirdPersonView *follow = new OkThirdPersonView(cam1);
+OkTopDownView     *map    = new OkTopDownView(cam2);
+map->setBounds(minX, minZ, maxX, maxZ, groundY);  // the sector to frame
+
+player->addView(follow);
+player->addView(map);
+```
+
+Stock views:
+
+- **`OkThirdPersonView`** — orbits behind/above the avatar and looks at it; the
+  mouse orbits it (yaw free, pitch clamped). Because it looks toward the avatar,
+  a camera-relative controller walks the avatar "into the screen".
+- **`OkTopDownView`** — straight down over a ground rectangle (the sector,
+  e.g. the current chunk), at the height that frames it
+  (`computeHeight(sizeX, sizeZ, fov, margin)`); ignores the mouse. Set the
+  rectangle with `setBounds`.
+

@@ -1,3 +1,4 @@
+#include "okinawa/avatar/top_down_view.hpp"
 #include "okinawa/avatar/walk_controller.hpp"
 #include "okinawa/input/input.hpp"
 #include "okinawa/math/rotation.hpp"
@@ -65,4 +66,18 @@ TEST_CASE("walk: diagonal movement is normalised (not faster)", "[avatar]") {
   OkGroundMove m = OkWalkController::computeGroundMove(in, cam, 10.0f, 1.0f);
   CHECK(m.moved);
   CHECK(near(mag2d(m), 10.0f));
+}
+
+TEST_CASE("top-down: height frames the rectangle for the FOV", "[avatar]") {
+  // 1200 m square, 60 deg vertical FOV, no margin: half / tan(30 deg).
+  float h = OkTopDownView::computeHeight(1200.0f, 1200.0f, 60.0f, 1.0f);
+  CHECK(std::fabs(h - 600.0f / std::tan(M_PI / 6.0f)) < 1.0f);
+
+  // The larger side drives it (1200, not 400).
+  float hWide = OkTopDownView::computeHeight(1200.0f, 400.0f, 60.0f, 1.0f);
+  CHECK(std::fabs(hWide - h) < 1e-3f);
+
+  // Margin raises the camera; a wider FOV lowers it.
+  CHECK(OkTopDownView::computeHeight(1200.0f, 1200.0f, 60.0f, 1.2f) > h);
+  CHECK(OkTopDownView::computeHeight(1200.0f, 1200.0f, 90.0f, 1.0f) < h);
 }

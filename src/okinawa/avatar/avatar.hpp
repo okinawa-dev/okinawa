@@ -3,9 +3,12 @@
 
 #include "controller.hpp"
 
+#include <vector>
+
 class OkObject;
 class OkCamera;
 class OkInputState;
+class OkCameraView;
 
 /**
  * @brief A controllable representation of the player in a scene: a controlled
@@ -34,9 +37,16 @@ public:
   OkAvatarController *getController() const { return _controller; }
   void                setController(OkAvatarController *controller);
 
+  // Camera rig: views that observe this avatar. The avatar owns them. Register
+  // each view's camera() with OkCore so the number keys can switch between
+  // them. Every view is repositioned each frame in update().
+  void          addView(OkCameraView *view);
+  OkCameraView *viewForCamera(const OkCamera *camera) const;
+
 private:
-  OkObject           *_controlled;  // not owned (the scene owns it)
-  OkAvatarController *_controller;   // owned
+  OkObject                   *_controlled;  // not owned (the scene owns it)
+  OkAvatarController         *_controller;  // owned
+  std::vector<OkCameraView *> _views;       // owned
 };
 
 #endif  // OK_AVATAR_HPP
