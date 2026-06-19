@@ -225,3 +225,21 @@ void OkCamera::drawSelf() {
     }
   }
 }
+
+void OkCamera::updateForTarget(const OkObject *target, float dt) {
+  // Base camera does not track anything; subclasses override.
+  (void)target;
+  (void)dt;
+}
+
+void OkCamera::look(float yawDeg, float pitchDeg) {
+  // Free-fly: rotate self. Convention: +yaw looks right, +pitch looks up. Pitch
+  // is clamped to avoid flipping.
+  OkRotation  rot      = getRotation();
+  float       pitch    = rot.getPitch() + glm::radians(pitchDeg);
+  float       yaw      = rot.getYaw() - glm::radians(yawDeg);
+  const float maxPitch = glm::radians(89.0f);
+  if (pitch > maxPitch) pitch = maxPitch;
+  if (pitch < -maxPitch) pitch = -maxPitch;
+  setRotation(pitch, yaw, rot.getRoll());
+}

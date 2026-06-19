@@ -45,6 +45,7 @@ public:
 
   // Camera management
   static void addCamera(OkCamera *camera);
+  static void clearCameras();  // delete all cameras (install your own set)
   static void switchCamera(int index);
   static int  getCurrentCameraIndex() { return _currentCamera; }
   static int  getCameraCount() { return static_cast<int>(_cameras.size()); }

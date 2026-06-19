@@ -16,7 +16,16 @@
 class OkCamera : public OkObject {
 public:
   OkCamera(const std::string &name, int width, int height);
+  virtual ~OkCamera() {}
   void setPerspective(float fovDegrees, float nearPlane, float farPlane);
+
+  // Reposition this camera for the frame given the entity it observes (may be
+  // null). Base camera does not track anything; subclasses (third-person,
+  // top-down, fixed, ...) override.
+  virtual void updateForTarget(const OkObject *target, float dt);
+  // Apply a look delta in degrees (mouse / look equivalent). Base behaviour is
+  // free-fly: rotate self with pitch clamped. Subclasses may orbit or ignore.
+  virtual void look(float yawDeg, float pitchDeg);
 
   // Getters for matrices
   const glm::mat4 &getView() const { return view; }

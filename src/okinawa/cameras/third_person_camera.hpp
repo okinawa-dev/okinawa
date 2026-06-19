@@ -1,0 +1,31 @@
+#ifndef OK_THIRD_PERSON_CAMERA_HPP
+#define OK_THIRD_PERSON_CAMERA_HPP
+
+#include "../core/camera.hpp"
+
+class OkObject;
+
+/**
+ * @brief Camera that orbits behind/above the target and looks at it. The mouse
+ *        (look) orbits it (yaw free, pitch clamped). Because it looks toward the
+ *        target, a camera-relative controller using this as its reference moves
+ *        the avatar "into the screen".
+ */
+class OkThirdPersonCamera : public OkCamera {
+public:
+  OkThirdPersonCamera(const std::string &name, int width, int height,
+                      float distance = 12.0f, float focusHeight = 1.5f);
+
+  void updateForTarget(const OkObject *target, float dt) override;
+  void look(float yawDeg, float pitchDeg) override;
+
+  void setDistance(float distance) { _distance = distance; }
+
+private:
+  float _distance;
+  float _focusHeight;
+  float _yaw;    // orbit angle around the target (radians)
+  float _pitch;  // orbit elevation (radians, clamped)
+};
+
+#endif  // OK_THIRD_PERSON_CAMERA_HPP

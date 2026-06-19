@@ -1,7 +1,6 @@
 #include "avatar.hpp"
 
 #include "../core/camera.hpp"
-#include "camera_view.hpp"
 
 OkAvatar::OkAvatar(OkObject *controlled, OkAvatarController *controller) {
   _controlled = controlled;
@@ -10,10 +9,7 @@ OkAvatar::OkAvatar(OkObject *controlled, OkAvatarController *controller) {
 
 OkAvatar::~OkAvatar() {
   delete _controller;
-  for (std::size_t i = 0; i < _views.size(); i++) {
-    delete _views[i];
-  }
-  _views.clear();
+  // _cameras are owned by OkCore; do not delete them here.
 }
 
 void OkAvatar::setController(OkAvatarController *controller) {
@@ -23,25 +19,17 @@ void OkAvatar::setController(OkAvatarController *controller) {
   }
 }
 
-void OkAvatar::addView(OkCameraView *view) {
-  if (view) _views.push_back(view);
-}
-
-OkCameraView *OkAvatar::viewForCamera(const OkCamera *camera) const {
-  for (std::size_t i = 0; i < _views.size(); i++) {
-    if (_views[i]->camera() == camera) return _views[i];
+void OkAvatar::addCamera(OkCamera *camera) {
+  if (camera) {
+    _cameras.push_back(camera);
   }
-  return nullptr;
 }
 
-void OkAvatar::update(float dt, const OkInputState &input,
-                      OkCamera *activeCamera) {
+void OkAvatar::update(float dt, const OkInputState &input) {
   if (_controller && _controlled) {
-    _controller->update(dt, input, *_controlled, activeCamera);
+    _controller->update(dt, input, *_controlled);
   }
-  // Reposition every view relative to the (now moved) avatar, so switching
-  // cameras is instant.
-  for (std::size_t i = 0; i < _views.size(); i++) {
-    if (_controlled) _views[i]->update(*_controlled, dt);
+  for (std::size_t i = 0; i < _cameras.size(); i++) {
+    _cameras[i]->updateForTarget(_controlled, dt);
   }
 }

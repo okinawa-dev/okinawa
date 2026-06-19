@@ -6,88 +6,80 @@ nav_order: 8
 
 # Avatars
 
-An **avatar** is the controllable representation of the player in a scene: a
-controlled object plus the input scheme (controller) that drives it. The avatar
-is the controlled entity; cameras are views of it. okinawa tracks an **active
-avatar** and feeds it the input each frame; swapping the active avatar (say, on
-foot to a car) changes the controls in one call.
+An **avatar** is the controllable representation of the player: a controlled
+object plus the input scheme (controller) that drives it, plus a **rig of
+cameras** that observe it. The avatar is the controlled entity; cameras are
+views of it.
+
+**Render and control are independent.** Switching the rendered camera (the
+number keys) never changes the controls: the controller carries its own
+reference frame, so you can watch from a debug top-down while the avatar keeps
+moving exactly as in third person.
 
 ## OkAvatar
 
 ```cpp
 #include "okinawa/avatar/avatar.hpp"
-#include "okinawa/avatar/controllers/walk_controller.hpp"
+#include "okinawa/avatar/controllers/ground_controller.hpp"
+#include "okinawa/cameras/third_person_camera.hpp"
+#include "okinawa/cameras/top_down_camera.hpp"
 
-// `prism` is an OkItem (or any OkObject) already in the scene.
-OkAvatar *player = new OkAvatar(prism, new OkWalkController(5.0f));
+OkGroundController *controller = new OkGroundController(8.0f);
+OkAvatar           *player     = new OkAvatar(prism, controller);
+
+OkThirdPersonCamera *third = new OkThirdPersonCamera("third", w, h);
+OkTopDownCamera     *top   = new OkTopDownCamera("top", w, h, 400.0f);
+OkCore::addCamera(third);   // key 1
+OkCore::addCamera(top);     // key 2
+
+controller->setReferenceCamera(third);  // control is relative to this camera
+player->addCamera(third);               // rig: cameras follow the avatar
+player->addCamera(top);
 OkCore::setActiveAvatar(player);
 ```
 
-`OkAvatar` owns its controller (deletes it) but **not** the controlled object,
-which belongs to the scene. `getControlledObject()` / `getController()` /
-`setController()` are available.
+`OkAvatar` owns its controller (deletes it) but **not** the controlled object
+(the scene owns it) nor the rig cameras (`OkCore` owns them). It updates the
+controller and repositions every rig camera each frame, so non-rendered cameras
+still track the avatar (their gizmos show).
 
-## OkAvatarController
+## Controllers
 
-The input scheme. Implement it for a custom control style:
+`OkAvatarController::update(dt, input, controlled)` — no camera is passed in; the
+controller obtains its own reference frame. Input stays **polled** per frame
+(see [Input](/reference/input.html)); discrete actions are edge-triggered.
 
-```cpp
-class OkAvatarController {
-  virtual void update(float dt, const OkInputState &input,
-                      OkObject &avatar, OkCamera *activeCamera) = 0;
-};
-```
+**`OkGroundController`** — stock controller: movement on the ground plane (XZ)
+relative to a reference frame, turning the object to face its movement (character,
+vehicle, ...). The frame is selectable, which is what keeps control independent
+of the rendered camera:
 
-`update` runs once per frame for the active avatar. `activeCamera` lets a
-controller make movement camera-relative. The engine keeps the **polled**
-per-frame input model (see [Input](/reference/input.html)); discrete actions use
-the edge-triggered action buttons.
+- `setReferenceCamera(cam)` — relative to that camera (the usual gameplay camera).
+- `setUseActiveCamera(true)` — relative to the active rendered camera
+  (room-relative control, fixed-camera games).
+- neither — relative to the controlled object's own facing.
 
-## OkWalkController
+## Cameras
 
-A stock controller: **camera-relative ground movement**. W/S move
-along the camera's forward (projected onto the ground), A/D strafe along its
-right, and the avatar turns to face its movement. `setMoveSpeed(float)` sets the
-speed in units per second. (Y is left untouched: there is no terrain-follow
-yet.)
+Camera behaviours are `OkCamera` subclasses. `OkCamera` has two virtuals:
+`updateForTarget(target, dt)` (reposition for what it observes; base does
+nothing) and `look(yawDeg, pitchDeg)` (base: free-fly rotate, pitch clamped).
+
+- **`OkThirdPersonCamera`** — orbits behind/above the target and looks at it;
+  the mouse/look orbits it (pitch clamped).
+- **`OkTopDownCamera`** — stays straight above the target, perpendicular, north
+  (+Z) up, at a fixed height; follows it; ignores the mouse. Debug/map view.
+- **`OkFixedCamera`** — static "Resident Evil" camera: fixed world position,
+  optionally re-aims at the target. Combine with `setUseActiveCamera` for
+  room-relative control.
+- **`OkSpectatorCamera`** — free-fly: ignores the target and flies from the
+  input state; mouse rotates it. Use with no active avatar for a debug
+  fly-through.
 
 ## Active avatar
 
 `OkCore::setActiveAvatar(avatar)` / `getActiveAvatar()`. The active avatar is
-updated each frame right after input and before the camera step. With **no**
-active avatar (the default), input keeps the free-fly camera behaviour, so the
-camera works as a debug fly-through.
-
-## Camera rig
-
-An avatar's cameras are **views** bound to it: each is an `OkCameraView` that
-repositions its camera relative to the avatar every frame. Register each view's
-camera with `OkCore::addCamera` so the **number keys** switch between them, and
-add the view to the avatar with `addView`. The active view also receives the
-mouse (others ignore it); with no active avatar the mouse drives the free-fly
-camera as before.
-
-```cpp
-OkCamera *cam1 = new OkCamera("third-person", w, h);
-OkCamera *cam2 = new OkCamera("top-down", w, h);
-OkCore::addCamera(cam1);   // key 1
-OkCore::addCamera(cam2);   // key 2
-
-OkThirdPersonView *follow = new OkThirdPersonView(cam1);
-OkTopDownView     *map    = new OkTopDownView(cam2);
-map->setBounds(minX, minZ, maxX, maxZ, groundY);  // the sector to frame
-
-player->addView(follow);
-player->addView(map);
-```
-
-Stock views:
-
-- **`OkThirdPersonView`** — orbits behind/above the avatar and looks at it; the
-  mouse orbits it (yaw free, pitch clamped). Because it looks toward the avatar,
-  a camera-relative controller walks the avatar "into the screen".
-- **`OkTopDownView`** — straight down over a ground rectangle (the sector,
-  e.g. the current chunk), at the height that frames it
-  (`computeHeight(sizeX, sizeZ, fov, margin)`); ignores the mouse. Set the
-  rectangle with `setBounds`.
-
+updated each frame after input. Swapping it (on foot -> car) changes controls
+and rig in one call. With **no** active avatar, the current camera still runs
+its own behaviour (e.g. a spectator flies). `OkCore::clearCameras()` lets a game
+drop the seeded default camera and install its own set.

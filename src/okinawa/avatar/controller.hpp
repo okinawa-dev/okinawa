@@ -2,7 +2,6 @@
 #define OK_AVATAR_CONTROLLER_HPP
 
 class OkObject;
-class OkCamera;
 class OkInputState;
 
 /**
@@ -16,15 +15,15 @@ public:
   virtual ~OkAvatarController() {}
 
   /**
-   * @brief Update the avatar for this frame.
-   * @param dt           Delta time in milliseconds (engine loop units).
-   * @param input        The current frame's input state.
-   * @param avatar       The controlled object to move/orient.
-   * @param activeCamera The active camera, so movement can be made
-   *                     camera-relative. May be null.
+   * @brief Update the avatar for this frame. The controller obtains its own
+   *        reference frame (e.g. a camera it holds), so it does not receive the
+   *        rendered camera: control is independent of what is on screen.
+   * @param dt        Delta time in milliseconds (engine loop units).
+   * @param input     The current frame's input state.
+   * @param controlled The controlled object to move/orient.
    */
-  virtual void update(float dt, const OkInputState &input, OkObject &avatar,
-                      OkCamera *activeCamera) = 0;
+  virtual void update(float dt, const OkInputState &input,
+                      OkObject &controlled) = 0;
 };
 
 #endif  // OK_AVATAR_CONTROLLER_HPP

@@ -1,6 +1,5 @@
 #include "core.hpp"
 #include "../avatar/avatar.hpp"
-#include "../avatar/camera_view.hpp"
 #include "../config/config.hpp"
 #include "../input/input.hpp"
 #include "../shaders/shaders.hpp"
@@ -273,10 +272,10 @@ void OkCore::loop(const OkCoreCallback &stepCallback,
       }
 
       // Drive the active avatar from input (before the game's step callback so
-      // it can react to the new pose). With no active avatar this is skipped and
-      // the camera keeps its free-fly behaviour.
-      if (_activeAvatar && !_cameras.empty()) {
-        _activeAvatar->update(dt, state, _cameras[_currentCamera]);
+      // it can react to the new pose). The controller carries its own reference
+      // frame, so control is independent of which camera is rendered.
+      if (_activeAvatar) {
+        _activeAvatar->update(dt, state);
       }
 
       // User step callback first to process input
@@ -284,7 +283,13 @@ void OkCore::loop(const OkCoreCallback &stepCallback,
         stepCallback(dt);
       }
 
-      // Call step function for the current camera
+      // Let the current camera reposition for what it observes (covers a
+      // standalone spectator/fixed camera with no active avatar), then step it.
+      if (!_cameras.empty()) {
+        OkObject *target =
+            _activeAvatar ? _activeAvatar->getControlledObject() : nullptr;
+        _cameras[_currentCamera]->updateForTarget(target, dt);
+      }
       _cameras[_currentCamera]->step(dt);
 
       OkScene *currentScene = _sceneHandler->getCurrentScene();
@@ -396,66 +401,38 @@ void OkCore::mouseCallback(GLFWwindow *window, double xpos, double ypos) {
   xoffset *= sensitivity;
   yoffset *= sensitivity;
 
-  // If the active avatar's current view consumes the mouse (e.g. third-person
-  // orbit), hand the delta to it and let the view own the camera's pose. The
-  // top-down view ignores it; with no active avatar we fall through to the
-  // free-fly rotation below.
-  if (_activeAvatar != nullptr) {
-    OkCameraView *view =
-        _activeAvatar->viewForCamera(_cameras[_currentCamera]);
-    if (view != nullptr) {
-      view->handleMouse(xoffset, yoffset);
-      return;
-    }
-  }
-
-  // Get current rotation from camera
-  OkRotation currentRotation = _cameras[_currentCamera]->getRotation();
-  float      pitch           = currentRotation.getPitch();
-  float      yaw             = currentRotation.getYaw();
-
-  // Update angles
-  // Convert to radians since OkRotation works in radians
-  pitch += glm::radians(yoffset);
-  yaw += glm::radians(-xoffset);
-
-  // Constrain pitch to avoid flipping (in radians)
-  const float maxPitch = glm::radians(89.0f);
-  pitch                = std::min(pitch, maxPitch);
-  pitch                = std::max(pitch, -maxPitch);
-
-  // Set new rotation
-  _cameras[_currentCamera]->setRotation(pitch, yaw, 0.0f);
+  // Route the look delta to the current camera: it orbits (third-person),
+  // free-flies (base/spectator) or ignores it (top-down/fixed), and repositions.
+  applyLook(xoffset, yoffset);
 }
 
 /**
- * @brief Apply a look delta (in degrees). If the active avatar owns a view for
- *        the current camera and that view consumes the mouse (e.g. third-person
- *        orbit), the delta drives the view; otherwise it rotates the current
- *        camera directly (free-fly). Used by the MCP look tool, so an agent can
- *        orbit the avatar even with physical input disabled.
+ * @brief Apply a look delta (in degrees) to the current camera. Each camera
+ *        decides what to do (orbit for third-person, free-fly for the base/
+ *        spectator, ignore for top-down/fixed). Repositions immediately so the
+ *        resulting pose is up to date. Used by the MCP look tool, so it works
+ *        even with physical input disabled.
  */
 void OkCore::applyLook(float yawDeg, float pitchDeg) {
   if (_cameras.empty()) {
     return;
   }
-  if (_activeAvatar != nullptr) {
-    OkCameraView *view = _activeAvatar->viewForCamera(_cameras[_currentCamera]);
-    if (view != nullptr) {
-      view->handleMouse(yawDeg, pitchDeg);
-      // Reposition now so the returned pose reflects the orbit immediately.
-      OkObject *controlled = _activeAvatar->getControlledObject();
-      if (controlled != nullptr) {
-        view->update(*controlled, 0.0f);
-      }
-      return;
-    }
+  _cameras[_currentCamera]->look(yawDeg, pitchDeg);
+  OkObject *target =
+      _activeAvatar ? _activeAvatar->getControlledObject() : nullptr;
+  _cameras[_currentCamera]->updateForTarget(target, 0.0f);
+}
+
+/**
+ * @brief Remove and delete all cameras (e.g. so a game can install its own set
+ *        instead of the seeded default). Resets the current index.
+ */
+void OkCore::clearCameras() {
+  for (std::size_t i = 0; i < _cameras.size(); i++) {
+    delete _cameras[i];
   }
-  OkCamera  *cam   = _cameras[_currentCamera];
-  OkRotation rot   = cam->getRotation();
-  float      pitch = rot.getPitch() + glm::radians(pitchDeg);
-  float      yaw   = rot.getYaw() + glm::radians(yawDeg);
-  cam->setRotation(pitch, yaw, rot.getRoll());
+  _cameras.clear();
+  _currentCamera = 0;
 }
 
 /**
