@@ -7,7 +7,7 @@ class OkCamera;
 class OkObject;
 
 /**
- * @brief GTA-style third-person camera: orbits behind/above the avatar and
+ * @brief Third-person camera: orbits behind/above the avatar and
  *        looks at it. The mouse orbits it (yaw freely, pitch clamped). Because
  *        it looks toward the avatar, the camera's forward (projected to the
  *        ground) is the direction the avatar walks "into the screen".

@@ -18,8 +18,8 @@ struct OkGroundMove {
 };
 
 /**
- * @brief Stock controller: camera-relative movement on the ground plane
- *        (GTA-style). W/S move along the camera's forward (projected onto the
+ * @brief Stock controller: camera-relative movement on the ground plane.
+ *        W/S move along the camera's forward (projected onto the
  *        ground), A/D strafe along its right; the avatar turns to face its
  *        movement direction. Y is left untouched (no terrain-follow yet).
  */

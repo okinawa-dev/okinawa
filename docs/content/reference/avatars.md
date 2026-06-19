@@ -45,7 +45,7 @@ the edge-triggered action buttons.
 
 ## OkWalkController
 
-A stock controller: **camera-relative ground movement** (GTA-style). W/S move
+A stock controller: **camera-relative ground movement**. W/S move
 along the camera's forward (projected onto the ground), A/D strafe along its
 right, and the avatar turns to face its movement. `setMoveSpeed(float)` sets the
 speed in units per second. (Y is left untouched: there is no terrain-follow
