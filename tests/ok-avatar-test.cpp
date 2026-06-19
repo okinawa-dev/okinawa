@@ -1,5 +1,5 @@
-#include "okinawa/avatar/top_down_view.hpp"
-#include "okinawa/avatar/walk_controller.hpp"
+#include "okinawa/avatar/cameras/top_down_view.hpp"
+#include "okinawa/avatar/controllers/walk_controller.hpp"
 #include "okinawa/input/input.hpp"
 #include "okinawa/math/rotation.hpp"
 

@@ -1,8 +1,8 @@
 #include "walk_controller.hpp"
 
-#include "../core/camera.hpp"
-#include "../core/object.hpp"
-#include "../math/math.hpp"
+#include "../../core/camera.hpp"
+#include "../../core/object.hpp"
+#include "../../math/math.hpp"
 
 OkWalkController::OkWalkController(float moveSpeed) {
   _moveSpeed = moveSpeed;

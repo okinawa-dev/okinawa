@@ -16,7 +16,7 @@ foot to a car) changes the controls in one call.
 
 ```cpp
 #include "okinawa/avatar/avatar.hpp"
-#include "okinawa/avatar/walk_controller.hpp"
+#include "okinawa/avatar/controllers/walk_controller.hpp"
 
 // `prism` is an OkItem (or any OkObject) already in the scene.
 OkAvatar *player = new OkAvatar(prism, new OkWalkController(5.0f));

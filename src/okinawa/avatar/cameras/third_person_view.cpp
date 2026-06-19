@@ -1,8 +1,8 @@
 #include "third_person_view.hpp"
 
-#include "../core/camera.hpp"
-#include "../core/object.hpp"
-#include "../math/math.hpp"
+#include "../../core/camera.hpp"
+#include "../../core/object.hpp"
+#include "../../math/math.hpp"
 
 #include <algorithm>
 #include <cmath>

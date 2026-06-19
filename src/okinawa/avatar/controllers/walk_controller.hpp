@@ -1,9 +1,9 @@
 #ifndef OK_WALK_CONTROLLER_HPP
 #define OK_WALK_CONTROLLER_HPP
 
-#include "../input/input.hpp"
-#include "../math/rotation.hpp"
-#include "controller.hpp"
+#include "../../input/input.hpp"
+#include "../../math/rotation.hpp"
+#include "../controller.hpp"
 
 /**
  * @brief Result of a ground-movement step: the XZ delta to apply and the yaw

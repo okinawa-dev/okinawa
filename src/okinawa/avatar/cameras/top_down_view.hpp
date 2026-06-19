@@ -1,7 +1,7 @@
 #ifndef OK_TOP_DOWN_VIEW_HPP
 #define OK_TOP_DOWN_VIEW_HPP
 
-#include "camera_view.hpp"
+#include "../camera_view.hpp"
 
 class OkCamera;
 class OkObject;
