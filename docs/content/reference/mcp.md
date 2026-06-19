@@ -33,6 +33,18 @@ OkCore::setIgnoreUserInput(true); // optional: MCP-only control
 
 `enableMcpServer(int port = 8765)` always exists. If the engine was built without MCP support it logs a warning and does nothing, so apps compile identically with or without the server. The server binds `127.0.0.1` on the given port and logs a line such as `MCP server listening on http://127.0.0.1:8765/mcp`.
 
+## Connecting a client
+
+Once a build with the server enabled is running (it logs `MCP server listening on http://127.0.0.1:8765/mcp`), point your MCP client at that URL. The transport is streamable HTTP.
+
+With the Claude Code CLI, add it on the command line:
+
+```bash
+claude mcp add --transport http okinawa http://127.0.0.1:8765/mcp
+```
+
+This registers the server (named `okinawa` here) at local scope. Reload or reconnect the client so it picks up the tools, then the tools listed above are available. Remove it later with `claude mcp remove okinawa`. The server only exists while the app runs, so start the app and reconnect each session.
+
 ## Compile-time toggle
 
 The server is compiled in by default and guarded by `OKINAWA_WITH_MCP` (xmake option `mcp`). Exclude it from lean builds with `xmake f --mcp=n`, or be explicit with `--mcp=y`. When excluded, no MCP/HTTP code or its header-only dependencies land in the binary.
