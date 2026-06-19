@@ -1,7 +1,7 @@
 ---
 title: Models
 section: Reference
-nav_order: 9
+nav_order: 4
 ---
 
 # Loading 3D models

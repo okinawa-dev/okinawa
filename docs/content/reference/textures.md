@@ -1,7 +1,7 @@
 ---
 title: Textures
 section: Reference
-nav_order: 10
+nav_order: 5
 ---
 
 # Textures
@@ -44,19 +44,14 @@ Useful queries: `isLoaded()`, `getWidth()`, `getHeight()`, `getChannels()`,
 `getPath()`. `OkTexture` is non-copyable (it owns a GL handle); pass it by
 pointer. `bind()` / `OkTexture::unbind()` are used by the renderer.
 
-## OkTextureHandler
+## Caching
 
-A singleton cache (`OkTextureHandler::getInstance()`) keyed by name/path, with
-reference counting so a shared texture is freed only when the last item drops
-it:
-
-- `getTexture(name)` — existing texture, or `nullptr`.
-- `createTextureFromFile(path)` — load (or reuse) and store; this is what
-  `OkItem::loadTextureFromFile` calls.
-- `createTextureFromRawData(name, data, w, h, channels)` — store an in-memory
-  texture under a name.
-- `addReference(name)` / `removeReference(name)` — adjust the ref count;
-  `OkItem`'s texture setters call these for you.
+Textures are cached and reference-counted by **OkTextureHandler**, a singleton:
+`OkItem::loadTextureFromFile` goes through it so the same image is shared, not
+reloaded, across items, and freed only when the last item drops it. Its full
+API is documented under
+[OkTextureHandler](/reference/handlers.html#oktexturehandler) in the Handlers
+reference.
 
 Prefer `OkItem::loadTextureFromFile` / `setTexture` for everyday use; reach for
 the handler directly only when you build textures from raw data or share one

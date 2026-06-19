@@ -1,7 +1,7 @@
 ---
 title: MCP server
 section: Reference
-nav_order: 8
+nav_order: 10
 ---
 
 # MCP server

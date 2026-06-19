@@ -1,7 +1,7 @@
 ---
 title: Math
 section: Reference
-nav_order: 4
+nav_order: 6
 ---
 
 # Math
