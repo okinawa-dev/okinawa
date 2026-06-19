@@ -16,28 +16,6 @@ number keys) never changes the controls: the controller carries its own
 reference frame, so you can watch from a debug top-down while the avatar keeps
 moving exactly as in third person.
 
-## Minimal example: a prism in third person
-
-The smallest full setup: a box as the avatar, a third-person camera following it.
-
-```cpp
-OkItem *prism = OkWavefrontImporter::importFile("assets/cube.obj");
-prism->setScaling(0.5f, 1.8f, 0.5f);
-scene->addObject(prism);
-
-OkGroundController *controller = new OkGroundController(8.0f);
-OkAvatar           *player     = new OkAvatar(prism, controller);
-
-OkThirdPersonCamera *cam = new OkThirdPersonCamera("third", 800, 600);
-OkCore::addCamera(cam);             // selectable with key 1
-controller->setReferenceCamera(cam);  // move relative to the camera
-player->addCamera(cam);             // camera follows the avatar
-OkCore::setActiveAvatar(player);
-```
-
-WASD moves the prism relative to the camera and the mouse orbits it. That is a
-complete third-person controller.
-
 ## OkAvatar
 
 ```cpp
