@@ -192,6 +192,11 @@ a { color: var(--koi-deep); text-decoration: none; }
   color: var(--ink);
   letter-spacing: -0.005em;
 }
+/* When jumping to a heading anchor, clear the sticky top bar so the heading
+   isn't hidden underneath it. */
+.prose :is(h1, h2, h3, h4, h5, h6)[id] {
+  scroll-margin-top: calc(var(--topbar-h) + 1rem);
+}
 .prose h1 {
   font-size: 2.55rem;
   margin: 0 0 0.4rem;
