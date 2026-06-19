@@ -16,10 +16,12 @@ public:
   static void setInt(const std::string &key, int value);
   static void setFloat(const std::string &key, float value);
   static void setBool(const std::string &key, bool value);
+  static void setString(const std::string &key, const std::string &value);
 
-  static int   getInt(const std::string &key);
-  static float getFloat(const std::string &key);
-  static bool  getBool(const std::string &key);
+  static int         getInt(const std::string &key);
+  static float       getFloat(const std::string &key);
+  static bool        getBool(const std::string &key);
+  static std::string getString(const std::string &key);
 
   // Reset every value back to the defaults, discarding anything set at
   // runtime. Mainly useful to isolate global state between unit tests.
@@ -32,9 +34,10 @@ private:
   void setDefaults();
 
   // Separate maps for each type
-  std::unordered_map<std::string, int>   intValues;
-  std::unordered_map<std::string, float> floatValues;
-  std::unordered_map<std::string, bool>  boolValues;
+  std::unordered_map<std::string, int>         intValues;
+  std::unordered_map<std::string, float>       floatValues;
+  std::unordered_map<std::string, bool>        boolValues;
+  std::unordered_map<std::string, std::string> stringValues;
 };
 
 #endif

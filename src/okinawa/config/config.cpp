@@ -22,8 +22,9 @@ void OkConfig::setDefaults() {
   boolValues["graphics.drawCameras"] = true;
 
   // Window settings
-  intValues["window.width"]  = 800;
-  intValues["window.height"] = 600;
+  intValues["window.width"]     = 800;
+  intValues["window.height"]    = 600;
+  stringValues["window.title"]  = "okinawa";
 
   // Performance settings
   intValues["fps"] = 60;
@@ -47,6 +48,7 @@ void OkConfig::reset() {
   config.intValues.clear();
   config.floatValues.clear();
   config.boolValues.clear();
+  config.stringValues.clear();
   config.setDefaults();
 }
 
@@ -88,6 +90,15 @@ void OkConfig::setBool(const std::string &key, bool value) {
 }
 
 /**
+ * @brief Set a string value in the configuration.
+ * @param key   The key for the configuration value.
+ * @param value The string value to set.
+ */
+void OkConfig::setString(const std::string &key, const std::string &value) {
+  getConfig().stringValues[key] = value;
+}
+
+/**
  * @brief Get an integer value from the configuration.
  * @param key The key for the configuration value.
  * @return The integer value associated with the key.
@@ -126,5 +137,19 @@ bool OkConfig::getBool(const std::string &key) {
   } catch (const std::exception &e) {
     OkLogger::error("Config", "Failed to get bool value for key: " + key);
     return false;
+  }
+}
+
+/**
+ * @brief Get a string value from the configuration.
+ * @param key The key for the configuration value.
+ * @return The string value associated with the key, or empty if missing.
+ */
+std::string OkConfig::getString(const std::string &key) {
+  try {
+    return getConfig().stringValues.at(key);
+  } catch (const std::exception &e) {
+    OkLogger::error("Config", "Failed to get string value for key: " + key);
+    return "";
   }
 }
