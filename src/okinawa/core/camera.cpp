@@ -121,8 +121,10 @@ void OkCamera::drawSelf() {
 
     // Only draw camera visualization if it's not the active camera
     if (this != OkCore::getCamera()) {
-      // Create camera body vertices (cube)
-      float size       = 10.0f;  // Size of camera cube
+      // Create camera body vertices (cube). All gizmo coordinates are multiples
+      // of `size`, so this scales the whole gizmo proportionally about its
+      // centre: 0.25 gives a ~0.5 m cube body.
+      float size       = 0.25f;  // Half-extent of the camera cube (~0.5 m body)
       float vertices[] = {
           // Camera body - cube vertices (x, y, z, u, v)
           -size, -size, -size, 0.0f, 0.0f,  // 0
