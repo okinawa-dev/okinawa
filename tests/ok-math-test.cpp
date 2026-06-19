@@ -91,8 +91,10 @@ TEST_CASE("OkMath direction vector to angles", "[math]") {
     OkPoint direction(1.0f, 0.0f, 0.0f);
     float   pitch, yaw;
     OkMath::directionVectorToAngles(direction, pitch, yaw);
+    // Facing world +X needs yaw = -90°: getForwardVector(0, -pi/2) =
+    // (-sin(-pi/2), 0, -cos(-pi/2)) = (1, 0, 0).
     REQUIRE_THAT(pitch, WithinAbs(0.0f, 0.0001f));
-    REQUIRE_THAT(yaw, WithinAbs(glm::half_pi<float>(), 0.0001f));
+    REQUIRE_THAT(yaw, WithinAbs(-glm::half_pi<float>(), 0.0001f));
   }
 
   SECTION("Direction vector (0,-1,-1)") {
@@ -170,111 +172,98 @@ TEST_CASE("OkMath direction vector to angles", "[math]") {
 }
 
 TEST_CASE("OkMath lookAt", "[math]") {
-  SECTION("Looking forward from origin") {
+  // lookAt must orient a camera so getForwardVector() points from eye to
+  // target. The camera ignores roll (its view is built from
+  // getForwardVector/getUpVector), so lookAt is roll-free; `up` only resolves
+  // the screen orientation when looking straight up or down.
+
+  SECTION("Looking forward (-Z) from origin") {
     OkPoint    eye(0.0f, 0.0f, 0.0f);
-    OkPoint    target(0.0f, 0.0f, -1.0f);  // Looking along -Z
+    OkPoint    target(0.0f, 0.0f, -1.0f);  // -Z is the default forward
     OkRotation rot = OkMath::lookAt(eye, target);
 
-    // Should produce a 180° yaw since forward is -Z
     REQUIRE_THAT(rot.getPitch(), WithinAbs(0.0f, 0.0001f));
-    REQUIRE_THAT(rot.getYaw(), WithinAbs(glm::pi<float>(), 0.0001f));
-    REQUIRE_THAT(rot.getRoll(), WithinAbs(0.0f, 0.0001f));
-  }
-
-  SECTION("Looking right from origin") {
-    OkPoint    eye(0.0f, 0.0f, 0.0f);
-    OkPoint    target(1.0f, 0.0f, 0.0f);  // Looking along +X
-    OkRotation rot = OkMath::lookAt(eye, target);
-
-    // Should be 90° yaw
-    REQUIRE_THAT(rot.getPitch(), WithinAbs(0.0f, 0.0001f));
-    REQUIRE_THAT(rot.getYaw(), WithinAbs(glm::half_pi<float>(), 0.0001f));
-    REQUIRE_THAT(rot.getRoll(), WithinAbs(0.0f, 0.0001f));
-  }
-
-  SECTION("Looking up from origin") {
-    OkPoint eye(0.0f, 0.0f, 0.0f);
-    OkPoint target(0.0f, 1.0f, 0.0f);  // Looking along +Y
-    // default up world vector (not passed as parameter)
-    OkRotation rot = OkMath::lookAt(eye, target);
-
-    // When looking straight up: Pitch should be -90°
-    REQUIRE_THAT(rot.getPitch(), WithinAbs(-glm::half_pi<float>(), 0.0001f));
     REQUIRE_THAT(rot.getYaw(), WithinAbs(0.0f, 0.0001f));
     REQUIRE_THAT(rot.getRoll(), WithinAbs(0.0f, 0.0001f));
 
-    // Verify forward vector points up regardless of yaw/roll
     OkPoint forward = rot.getForwardVector();
-    REQUIRE_THAT(forward.y(), WithinAbs(-1.0f, 0.0001f));
+    REQUIRE_THAT(forward.x(), WithinAbs(0.0f, 0.0001f));
+    REQUIRE_THAT(forward.y(), WithinAbs(0.0f, 0.0001f));
+    REQUIRE_THAT(forward.z(), WithinAbs(-1.0f, 0.0001f));
+  }
 
-    // Only verify magnitude of x and z components combined is near zero
+  SECTION("Looking right (+X) from origin") {
+    OkPoint    eye(0.0f, 0.0f, 0.0f);
+    OkPoint    target(1.0f, 0.0f, 0.0f);  // +X needs yaw = -90°
+    OkRotation rot = OkMath::lookAt(eye, target);
+
+    REQUIRE_THAT(rot.getPitch(), WithinAbs(0.0f, 0.0001f));
+    REQUIRE_THAT(rot.getYaw(), WithinAbs(-glm::half_pi<float>(), 0.0001f));
+
+    OkPoint forward = rot.getForwardVector();
+    REQUIRE_THAT(forward.x(), WithinAbs(1.0f, 0.0001f));
+    REQUIRE_THAT(forward.y(), WithinAbs(0.0f, 0.0001f));
+    REQUIRE_THAT(forward.z(), WithinAbs(0.0f, 0.0001f));
+  }
+
+  SECTION("Looking up (+Y): forward points up") {
+    OkPoint    eye(0.0f, 0.0f, 0.0f);
+    OkPoint    target(0.0f, 1.0f, 0.0f);  // straight up
+    OkRotation rot = OkMath::lookAt(eye, target);
+
+    REQUIRE_THAT(rot.getPitch(), WithinAbs(glm::half_pi<float>(), 0.0001f));
+
+    OkPoint forward = rot.getForwardVector();
+    REQUIRE_THAT(forward.y(), WithinAbs(1.0f, 0.0001f));
     float xzMagnitude =
         std::sqrt(forward.x() * forward.x() + forward.z() * forward.z());
     REQUIRE_THAT(xzMagnitude, WithinAbs(0.0f, 0.0001f));
   }
 
-  SECTION("Looking up with alternate up vector") {
-    OkPoint eye(0.0f, 0.0f, 0.0f);
-    OkPoint target(0.0f, 1.0f, 0.0f);   // Looking straight up (+Y)
-    OkPoint worldUp(0.0f, 1.0f, 0.0f);  // Up vector parallel to look direction
-    OkRotation rot = OkMath::lookAt(eye, target, worldUp);
+  SECTION("Top-down with north-up: up vector picks the screen orientation") {
+    OkPoint    eye(0.0f, 100.0f, 0.0f);
+    OkPoint    target(0.0f, 0.0f, 0.0f);  // straight down
+    OkPoint    north(0.0f, 0.0f, 1.0f);   // world +Z should be up on screen
+    OkRotation rot = OkMath::lookAt(eye, target, north);
 
-    // Verify the resulting orientation
-    REQUIRE_THAT(rot.getPitch(), WithinAbs(-glm::half_pi<float>(), 0.0001f));
-    REQUIRE_THAT(rot.getYaw(), WithinAbs(0.0f, 0.0001f));
-    REQUIRE_THAT(rot.getRoll(), WithinAbs(0.0f, 0.0001f));
-
-    // Get the resulting basis vectors
     OkPoint forward = rot.getForwardVector();
-    OkPoint right   = rot.getRightVector();
     OkPoint up      = rot.getUpVector();
 
-    // Forward should point up
+    // Looks straight down...
     REQUIRE_THAT(forward.y(), WithinAbs(-1.0f, 0.0001f));
-
-    // Right should be along +X (since we use Z as temporary up)
-    REQUIRE_THAT(right.x(), WithinAbs(1.0f, 0.0001f));
-    REQUIRE_THAT(right.y(), WithinAbs(0.0f, 0.0001f));
-    REQUIRE_THAT(right.z(), WithinAbs(0.0f, 0.0001f));
-
-    // Up should be along -Z (cross product of forward and right)
+    // ...with world +Z as the on-screen up.
     REQUIRE_THAT(up.x(), WithinAbs(0.0f, 0.0001f));
     REQUIRE_THAT(up.y(), WithinAbs(0.0f, 0.0001f));
-    REQUIRE_THAT(up.z(), WithinAbs(-1.0f, 0.0001f));
-
-    // Vectors should be orthogonal
-    float dotFR = forward.dot(right);
-    float dotFU = forward.dot(up);
-    float dotRU = right.dot(up);
-    REQUIRE_THAT(dotFR, WithinAbs(0.0f, 0.0001f));
-    REQUIRE_THAT(dotFU, WithinAbs(0.0f, 0.0001f));
-    REQUIRE_THAT(dotRU, WithinAbs(0.0f, 0.0001f));
+    REQUIRE_THAT(up.z(), WithinAbs(1.0f, 0.0001f));
   }
+}
 
-  SECTION("Looking almost straight up - parallel up vector") {
-    OkPoint eye(0.0f, 0.0f, 0.0f);
-    // Create a forward vector that is:
-    // 1. Not too vertical (y < 0.999999f) to trigger second condition
-    // 2. But parallel to worldUp to trigger first condition
-    OkPoint    target(0.1f, 0.99f, 0.0f);   // Less vertical
-    OkPoint    worldUp(0.1f, 0.99f, 0.0f);  // Same direction as target
-    OkRotation rot = OkMath::lookAt(eye, target, worldUp);
+TEST_CASE("OkMath forward/angle round-trip", "[math]") {
+  // directionVectorToAngles and lookAt must invert OkRotation::getForwardVector
+  // (the convention the camera renders). Round-trip a spread of orientations.
+  const float pitches[] = {-1.2f, -0.6f, 0.0f, 0.4f, 1.0f};
+  const float yaws[]    = {-3.0f, -1.5f, -0.3f, 0.0f, 0.7f, 2.2f, 3.0f};
 
-    // Get the resulting basis vectors
-    OkPoint forward = rot.getForwardVector();
-    OkPoint right   = rot.getRightVector();
-    OkPoint up      = rot.getUpVector();
+  for (int i = 0; i < 5; i++) {
+    for (int j = 0; j < 7; j++) {
+      OkRotation source(pitches[i], yaws[j], 0.0f);
+      OkPoint     f = source.getForwardVector();
 
-    // Forward should NOT be exactly vertical
-    REQUIRE_THAT(std::abs(forward.y()), WithinAbs(0.99f, 0.01f));
+      // directionVectorToAngles -> rebuild forward -> must match.
+      float p, y;
+      OkMath::directionVectorToAngles(f, p, y);
+      OkPoint rebuilt = OkRotation(p, y, 0.0f).getForwardVector();
+      REQUIRE_THAT(rebuilt.x(), WithinAbs(f.x(), 0.001f));
+      REQUIRE_THAT(rebuilt.y(), WithinAbs(f.y(), 0.001f));
+      REQUIRE_THAT(rebuilt.z(), WithinAbs(f.z(), 0.001f));
 
-    // Right should be along +X since Z was used as temporary up
-    REQUIRE_THAT(right.x(), WithinAbs(0.0f, 0.0001f));
-    REQUIRE_THAT(right.y(), WithinAbs(0.0f, 0.0001f));
-    REQUIRE_THAT(right.z(), WithinAbs(-1.0f, 0.0001f));
-
-    // Up should be along -Z (cross product of forward and right)
-    REQUIRE_THAT(up.z(), WithinAbs(0.0f, 0.0001f));
+      // lookAt from origin toward f must reproduce the same forward.
+      OkPoint lookForward =
+          OkMath::lookAt(OkPoint(0.0f, 0.0f, 0.0f), f).getForwardVector();
+      REQUIRE_THAT(lookForward.x(), WithinAbs(f.x(), 0.001f));
+      REQUIRE_THAT(lookForward.y(), WithinAbs(f.y(), 0.001f));
+      REQUIRE_THAT(lookForward.z(), WithinAbs(f.z(), 0.001f));
+    }
   }
 }
 

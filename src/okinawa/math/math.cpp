@@ -59,23 +59,18 @@ void OkMath::directionVectorToAngles(const OkPoint &direction, float &outPitch,
   y                    = normalized.y;
   z                    = normalized.z;
 
-  // Calculate pitch (up/down)
+  // Pitch is the elevation; positive y looks up.
   outPitch = asin(y);
-  float cp = cos(outPitch);
 
-  // Handle vertical look case first (near ±90° pitch)
+  // Vertical look (near ±90° pitch): yaw is indeterminate, default to 0.
   if (std::abs(std::abs(y) - 1.0f) < 0.0001f) {
-    outYaw = 0.0f;  // Set default yaw for vertical look
+    outYaw = 0.0f;
   }
-  // this second else-if is an impossible case since we already checked
-  // for vertical look above
-  // Handle near-vertical case where cos(pitch) is very small
-  // else if (cp <= 0.001f) {
-  //   outYaw = 0.0f;  // Set default yaw for near-vertical look
-  // }
-  // Normal case - calculate yaw
+  // Inverse of OkRotation::getForwardVector = (-sin(yaw)cos(pitch),
+  // sin(pitch), -cos(yaw)cos(pitch)). atan2 is scale-invariant, so the positive
+  // cos(pitch) factor drops out and yaw = atan2(-x, -z).
   else {
-    outYaw = atan2(x / cp, -z / cp);
+    outYaw = atan2(-x, -z);
   }
 
   // This code shouldn't be reached due to early return above
@@ -108,80 +103,38 @@ void OkMath::directionVectorToAngles(const OkPoint &direction, float &outPitch,
  */
 OkRotation OkMath::lookAt(const OkPoint &eye, const OkPoint &target,
                           const OkPoint &up) {
-  // Calculate forward direction (from eye to target)
-  glm::vec3 eyePos(eye.x(), eye.y(), eye.z());
-  glm::vec3 targetPos(target.x(), target.y(), target.z());
-  glm::vec3 worldUp(up.x(), up.y(), up.z());
+  // Direction from eye to target, in the camera's getForwardVector convention
+  // (the camera renders from getForwardVector/getUpVector, which depend only on
+  // pitch and yaw and ignore roll). So this returns a roll-free orientation;
+  // `up` only matters when the forward is vertical (the gimbal-lock case),
+  // where it selects which world direction is "up" on screen.
+  glm::vec3 forward = glm::normalize(glm::vec3(
+      target.x() - eye.x(), target.y() - eye.y(), target.z() - eye.z()));
 
-  // Normalize the up vector
-  worldUp = glm::normalize(worldUp);
+  float fy = forward.y;
+  if (fy > 1.0f) fy = 1.0f;
+  if (fy < -1.0f) fy = -1.0f;
+  float pitch = asin(fy);
 
-  // Calculate the forward vector (direction from eye to target)
-  glm::vec3 forward = glm::normalize(targetPos - eyePos);
-
-  // Special case: if forward and up are parallel, nudge the up vector
-  if (glm::abs(glm::dot(forward, worldUp)) > 0.999999f) {
-    // Choose a different up vector if they're nearly parallel
-    if (glm::abs(forward.y) < 0.999999f) {
-      worldUp = glm::vec3(0, 0, 1);  // Use world Z as up instead
-    } else {
-      worldUp = glm::vec3(1, 0, 0);  // Use world X as up instead
+  const float eps = 1e-4f;
+  float       yaw = 0.0f;
+  if (std::abs(std::abs(forward.y) - 1.0f) < eps) {
+    // Vertical look. getUpVector at vertical is (-sin(yaw), 0, -cos(yaw)) when
+    // looking down and (sin(yaw), 0, cos(yaw)) when looking up, so pick yaw to
+    // match the horizontal part of `up` (e.g. world +Z for a north-up map).
+    glm::vec3 upHorizontal(up.x(), 0.0f, up.z());
+    if (glm::length(upHorizontal) >= eps) {
+      upHorizontal = glm::normalize(upHorizontal);
+      if (forward.y < 0.0f) {
+        yaw = atan2(-upHorizontal.x, -upHorizontal.z);
+      } else {
+        yaw = atan2(upHorizontal.x, upHorizontal.z);
+      }
     }
+  } else {
+    // Inverse of getForwardVector: yaw = atan2(-x, -z).
+    yaw = atan2(-forward.x, -forward.z);
   }
 
-  // Calculate the right vector
-  glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
-
-  // Recalculate the orthogonal up vector
-  glm::vec3 upDir = glm::cross(right, forward);
-
-  // Extract the rotation angles from these vectors
-
-  // 1. Calculate pitch: angle between forward and the xz-plane
-  // The dot product of forward and (0,1,0) gives us the sine of the pitch angle
-  float pitch = -asin(forward.y);
-
-  // Check for vertical look (near ±90° pitch)
-  if (std::abs(std::abs(forward.y) - 1.0f) < 0.001f) {
-    // Looking straight up or down
-    return OkRotation(pitch, 0.0f, 0.0f);  // Set yaw and roll to 0
-  }
-
-  // 2. Calculate yaw: angle between the projection of forward on the xz-plane
-  // and the z-axis Project forward onto xz-plane by zeroing y component
-  glm::vec3 forwardXZ = glm::normalize(glm::vec3(forward.x, 0.0f, forward.z));
-  float     yaw       = atan2(forwardXZ.x, forwardXZ.z);
-
-  // 3. Calculate roll (only for non-vertical orientations): measure how much
-  // the up vector is rotated around the forward axis First, create the
-  // "expected" up vector for this pitch and yaw (without roll)
-  float cp = cos(pitch);
-  float sp = sin(pitch);
-  float cy = cos(yaw);
-  float sy = sin(yaw);
-
-  // Expected up vector if roll=0 (derived from rotation matrix)
-  glm::vec3 expectedUp = glm::normalize(glm::vec3(-sy * sp, cp, -cy * sp));
-
-  // Project actual up vector onto the plane perpendicular to forward
-  glm::vec3 projectedUp = upDir - forward * glm::dot(upDir, forward);
-  projectedUp           = glm::normalize(projectedUp);
-
-  // Project expected up onto the same plane
-  glm::vec3 projectedExpectedUp =
-      expectedUp - forward * glm::dot(expectedUp, forward);
-  projectedExpectedUp = glm::normalize(projectedExpectedUp);
-
-  // Calculate roll by finding the angle between these two projections
-  float roll =
-      acos(glm::clamp(glm::dot(projectedUp, projectedExpectedUp), -1.0f, 1.0f));
-
-  // Determine roll sign by testing which side of the expected up the actual up
-  // is
-  glm::vec3 rollTest = glm::cross(projectedExpectedUp, projectedUp);
-  if (glm::dot(rollTest, forward) < 0) {
-    roll = -roll;
-  }
-
-  return OkRotation(pitch, yaw, roll);
+  return OkRotation(pitch, yaw, 0.0f);
 }
