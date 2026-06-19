@@ -429,6 +429,36 @@ void OkCore::mouseCallback(GLFWwindow *window, double xpos, double ypos) {
 }
 
 /**
+ * @brief Apply a look delta (in degrees). If the active avatar owns a view for
+ *        the current camera and that view consumes the mouse (e.g. third-person
+ *        orbit), the delta drives the view; otherwise it rotates the current
+ *        camera directly (free-fly). Used by the MCP look tool, so an agent can
+ *        orbit the avatar even with physical input disabled.
+ */
+void OkCore::applyLook(float yawDeg, float pitchDeg) {
+  if (_cameras.empty()) {
+    return;
+  }
+  if (_activeAvatar != nullptr) {
+    OkCameraView *view = _activeAvatar->viewForCamera(_cameras[_currentCamera]);
+    if (view != nullptr) {
+      view->handleMouse(yawDeg, pitchDeg);
+      // Reposition now so the returned pose reflects the orbit immediately.
+      OkObject *controlled = _activeAvatar->getControlledObject();
+      if (controlled != nullptr) {
+        view->update(*controlled, 0.0f);
+      }
+      return;
+    }
+  }
+  OkCamera  *cam   = _cameras[_currentCamera];
+  OkRotation rot   = cam->getRotation();
+  float      pitch = rot.getPitch() + glm::radians(pitchDeg);
+  float      yaw   = rot.getYaw() + glm::radians(yawDeg);
+  cam->setRotation(pitch, yaw, rot.getRoll());
+}
+
+/**
  * @brief Add a camera to the engine.
  * @param camera The camera to add.
  */

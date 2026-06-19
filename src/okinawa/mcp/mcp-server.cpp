@@ -302,7 +302,7 @@ struct OkMcpServer::Impl {
 
     json look;
     look["name"]        = "look";
-    look["description"] = "Rotate the active camera by the given deltas in degrees (the look / move-mouse equivalent). Returns the resulting camera pose.";
+    look["description"] = "Rotate the active view by the given deltas in degrees (the look / move-mouse equivalent): orbits the avatar when an avatar view is active, otherwise rotates the free-fly camera. Works with physical input disabled. Returns the resulting camera pose.";
     look["inputSchema"] = {{"type", "object"}, {"properties", {{"yaw_deg", {{"type", "number"}}}, {"pitch_deg", {{"type", "number"}}}}}, {"additionalProperties", false}};
     tools.push_back(look);
 
@@ -400,10 +400,9 @@ struct OkMcpServer::Impl {
         if (cam == nullptr) {
           return json{{"error", "no active camera"}};
         }
-        OkRotation rot   = cam->getRotation();
-        float      pitch = static_cast<float>(rot.getPitch() + degToRad(dpitch));
-        float      yaw   = static_cast<float>(rot.getYaw() + degToRad(dyaw));
-        cam->setRotation(pitch, yaw, rot.getRoll());
+        // Routes to the active avatar's view (orbit) when present, else rotates
+        // the current camera directly. Works even with physical input disabled.
+        OkCore::applyLook(static_cast<float>(dyaw), static_cast<float>(dpitch));
         return cameraPoseJson();
       });
       return textResult(pose.dump(2));

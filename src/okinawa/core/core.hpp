@@ -56,6 +56,10 @@ public:
   static void      setActiveAvatar(OkAvatar *avatar) { _activeAvatar = avatar; }
   static OkAvatar *getActiveAvatar() { return _activeAvatar; }
 
+  // Apply a look delta in degrees: orbits the active avatar's current view if it
+  // consumes the mouse, otherwise rotates the current camera (free-fly).
+  static void applyLook(float yawDeg, float pitchDeg);
+
   // Enable the in-engine MCP server so an external agent can connect over
   // local HTTP and drive the app (v1: capture the rendered frame). Binds
   // 127.0.0.1:port. This symbol always exists; if the engine was built

@@ -18,7 +18,7 @@ The server exposes these tools to a connected agent:
 | `screenshot` | Writes the current frame to a PNG file on disk (for a human) and returns the path. Optional `path` (default `okinawa-screenshot.png`). |
 | `press_key` | Holds a key for a duration to drive the app: W/A/S/D move, SPACE/T/R/F are actions, 1-9 switch camera, arrows turn. Args: `key`, `duration_ms` (default 120). Returns the resulting camera pose. |
 | `press_keys` | Holds several keys at once (e.g. W and D for diagonal movement). Args: `keys`, `duration_ms`. Returns the resulting camera pose. |
-| `look` | Rotates the active camera by `yaw_deg` / `pitch_deg` (the look / mouse-move equivalent). Returns the resulting camera pose. |
+| `look` | Rotates the active view by `yaw_deg` / `pitch_deg` (the look / mouse-move equivalent): orbits the avatar when an avatar view is active, otherwise rotates the free-fly camera. Works with physical input disabled. Returns the resulting camera pose. |
 | `set_camera_pose` | Teleports and orients the active camera directly (`x`, `y`, `z`, `pitch_deg`, `yaw_deg`, `roll_deg`); omitted fields keep their current value. Returns the resulting camera pose. |
 | `get_state` | Returns numeric runtime state: active camera pose, fps, scene object count, window size and resident memory. |
 
