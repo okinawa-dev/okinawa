@@ -41,14 +41,7 @@ void OkThirdPersonView::update(const OkObject &target, float dt) {
   OkPoint back(std::sin(_yaw) * cp, sp, std::cos(_yaw) * cp);
   OkPoint eye = focus + back * _distance;
 
-  // Look from the camera toward the avatar. Use directionVectorToAngles (the
-  // engine's camera convention) rather than OkMath::lookAt, whose pitch/yaw
-  // signs are inconsistent with it.
-  float pitch = 0.0f;
-  float yaw   = 0.0f;
-  OkMath::directionVectorToAngles((focus - eye).normalize(), pitch, yaw);
-
   _camera->setPosition(eye);
-  _camera->setRotation(pitch, yaw, 0.0f);
+  _camera->setRotation(OkMath::lookAt(eye, focus));  // aim at the avatar
   _camera->setSpeed(0.0f, 0.0f, 0.0f);  // positioned directly, not integrated
 }

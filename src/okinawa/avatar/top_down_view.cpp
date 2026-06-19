@@ -44,16 +44,12 @@ void OkTopDownView::update(const OkObject &target, float dt) {
 
   float   height = computeHeight(_sizeX, _sizeZ, _fov, _margin);
   OkPoint eye(_centerX, _groundY + height, _centerZ);
+  OkPoint look(_centerX, _groundY, _centerZ);
 
-  // Look straight down. Use directionVectorToAngles (the engine's camera
-  // convention); for a vertical direction it yields pitch = -90 deg, yaw 0.
-  float pitch = 0.0f;
-  float yaw   = 0.0f;
-  OkMath::directionVectorToAngles(OkPoint(0.0f, -1.0f, 0.0f), pitch, yaw);
-
-  // Far plane must clear the height; near small.
+  // Straight down, with world north (+Z) up on screen. Far plane clears the
+  // height; near small.
   _camera->setPerspective(_fov, 1.0f, height * 2.0f + 1000.0f);
   _camera->setPosition(eye);
-  _camera->setRotation(pitch, yaw, 0.0f);
+  _camera->setRotation(OkMath::lookAt(eye, look, OkPoint(0.0f, 0.0f, 1.0f)));
   _camera->setSpeed(0.0f, 0.0f, 0.0f);
 }
