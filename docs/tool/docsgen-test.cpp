@@ -130,3 +130,14 @@ TEST_CASE("renderMarkdown emits html, including GFM tables", "[docs]") {
       "| A | B |\n| - | - |\n| 1 | 2 |\n");
   REQUIRE(table.find("<table") != std::string::npos);
 }
+
+TEST_CASE("renderMarkdown gives headings slug ids for deep links", "[docs]") {
+  std::string h = docsgen::renderMarkdown("## OkTextureHandler\n");
+  REQUIRE(h.find("id=\"oktexturehandler\"") != std::string::npos);
+
+  std::string multi = docsgen::renderMarkdown(
+      "## What the OBJ parser reads\n\n## What the OBJ parser reads\n");
+  REQUIRE(multi.find("id=\"what-the-obj-parser-reads\"") != std::string::npos);
+  // A duplicate slug on the same page gets a numeric suffix.
+  REQUIRE(multi.find("id=\"what-the-obj-parser-reads-2\"") != std::string::npos);
+}

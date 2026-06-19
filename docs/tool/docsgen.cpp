@@ -1,7 +1,9 @@
 #include "docsgen.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
+#include <map>
 
 #include <md4c-html.h>
 
@@ -84,6 +86,77 @@ std::string prefixRootRel(const std::string &html, const std::string &token,
 void mdSink(const MD_CHAR *text, MD_SIZE size, void *userdata) {
   std::string *out = static_cast<std::string *>(userdata);
   out->append(text, size);
+}
+
+// Strip HTML tags from a fragment, leaving its text content.
+std::string stripTags(const std::string &html) {
+  std::string out;
+  bool        inTag = false;
+  for (std::size_t i = 0; i < html.size(); i++) {
+    char c = html[i];
+    if (c == '<') {
+      inTag = true;
+    } else if (c == '>') {
+      inTag = false;
+    } else if (!inTag) {
+      out += c;
+    }
+  }
+  return out;
+}
+
+// GitHub-style heading slug: lowercase, runs of non-alphanumeric become a
+// single hyphen, leading/trailing hyphens trimmed.
+std::string slugify(const std::string &text) {
+  std::string out;
+  bool        pendingHyphen = false;
+  for (std::size_t i = 0; i < text.size(); i++) {
+    unsigned char c = static_cast<unsigned char>(text[i]);
+    if (std::isalnum(c)) {
+      if (pendingHyphen && !out.empty()) out += '-';
+      pendingHyphen = false;
+      out += static_cast<char>(std::tolower(c));
+    } else {
+      pendingHyphen = true;
+    }
+  }
+  return out;
+}
+
+// Give every <h1>..<h6> an id slugged from its text, so sections can be
+// deep-linked (e.g. handlers.html#oktexturehandler). Duplicate slugs on a page
+// get a -2, -3, ... suffix.
+std::string addHeadingAnchors(const std::string &html) {
+  std::string                 out;
+  out.reserve(html.size() + 128);
+  std::map<std::string, int> seen;
+  std::size_t                i = 0;
+  while (i < html.size()) {
+    if (html[i] == '<' && i + 3 < html.size() && html[i + 1] == 'h' &&
+        html[i + 2] >= '1' && html[i + 2] <= '6' && html[i + 3] == '>') {
+      char        level    = html[i + 2];
+      std::string closeTag = std::string("</h") + level + ">";
+      std::size_t start    = i + 4;
+      std::size_t close    = html.find(closeTag, start);
+      if (close != std::string::npos) {
+        std::string inner = html.substr(start, close - start);
+        std::string slug  = slugify(stripTags(inner));
+        if (!slug.empty()) {
+          int         n  = ++seen[slug];
+          std::string id = (n == 1) ? slug : slug + "-" + std::to_string(n);
+          out += "<h";
+          out += level;
+          out += " id=\"" + id + "\">";
+          out += inner;
+          out += closeTag;
+          i = close + closeTag.size();
+          continue;
+        }
+      }
+    }
+    out += html[i++];
+  }
+  return out;
 }
 
 }  // namespace
@@ -211,7 +284,7 @@ std::string renderMarkdown(const std::string &markdown) {
   unsigned parserFlags = MD_DIALECT_GITHUB;
   md_html(markdown.data(), static_cast<MD_SIZE>(markdown.size()), mdSink, &out,
           parserFlags, 0);
-  return out;
+  return addHeadingAnchors(out);
 }
 
 }  // namespace docsgen
