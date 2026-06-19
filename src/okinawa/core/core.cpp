@@ -1,4 +1,5 @@
 #include "core.hpp"
+#include "../avatar/avatar.hpp"
 #include "../config/config.hpp"
 #include "../input/input.hpp"
 #include "../shaders/shaders.hpp"
@@ -28,6 +29,7 @@ OkSceneHandler         *OkCore::_sceneHandler  = nullptr;
 GLuint                  OkCore::_shaderProgram = 0;
 OkInput                *OkCore::_input         = nullptr;
 OkMcpServer            *OkCore::_mcpServer     = nullptr;
+OkAvatar               *OkCore::_activeAvatar  = nullptr;
 
 /**
  * @brief Enable the in-engine MCP server so an external agent can connect
@@ -267,6 +269,13 @@ void OkCore::loop(const OkCoreCallback &stepCallback,
       OkInputState state = _input->getState();
       if (state.changeCamera != -1) {
         switchCamera(state.changeCamera);
+      }
+
+      // Drive the active avatar from input (before the game's step callback so
+      // it can react to the new pose). With no active avatar this is skipped and
+      // the camera keeps its free-fly behaviour.
+      if (_activeAvatar && !_cameras.empty()) {
+        _activeAvatar->update(dt, state, _cameras[_currentCamera]);
       }
 
       // User step callback first to process input

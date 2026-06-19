@@ -12,6 +12,9 @@
 // full definition (and dependencies) stays out of this public header.
 class OkMcpServer;
 
+// Forward declaration: the active avatar is tracked as a pointer (not owned).
+class OkAvatar;
+
 /**
  * @brief Core class for the Okinawa engine.
  *        It handles the initialization of OpenGL, shaders, and the main loop.
@@ -46,6 +49,13 @@ public:
   static int  getCurrentCameraIndex() { return _currentCamera; }
   static int  getCameraCount() { return static_cast<int>(_cameras.size()); }
 
+  // Active avatar: the controlled entity that receives input each frame. Not
+  // owned by the core (the game keeps ownership). Set null to fall back to the
+  // free-fly camera control. Swapping it (on foot -> car) changes the controls
+  // and camera behaviour in one call.
+  static void      setActiveAvatar(OkAvatar *avatar) { _activeAvatar = avatar; }
+  static OkAvatar *getActiveAvatar() { return _activeAvatar; }
+
   // Enable the in-engine MCP server so an external agent can connect over
   // local HTTP and drive the app (v1: capture the rendered frame). Binds
   // 127.0.0.1:port. This symbol always exists; if the engine was built
@@ -69,6 +79,7 @@ private:
   static GLuint                  _shaderProgram;
   static OkInput                *_input;
   static OkMcpServer            *_mcpServer;
+  static OkAvatar               *_activeAvatar;
 
   static void mouseCallback(GLFWwindow *window, double xpos, double ypos);
   // Keep the GL viewport matching the (possibly HiDPI) framebuffer size.
