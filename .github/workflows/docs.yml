@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # GLFW (pulled by the engine via xrepo) needs the X11/OpenGL dev
       # headers to build; xvfb + the mesa software rasteriser give the
@@ -38,7 +38,7 @@ jobs:
         uses: xmake-io/github-action-setup-xmake@v1
 
       - name: Cache xmake packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.xmake
           key: xmake-${{ runner.os }}-${{ hashFiles('xmake.lua') }}
@@ -65,13 +65,13 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up xmake
         uses: xmake-io/github-action-setup-xmake@v1
 
       - name: Cache xmake packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.xmake
           key: xmake-${{ runner.os }}-${{ hashFiles('xmake.lua') }}
@@ -87,10 +87,10 @@ jobs:
         run: xmake run -P docs/tool okinawa-docs --in docs/content --out docs/dist --base-url /okinawa --static docs/static
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs/dist
 
       - name: Deploy to GitHub Pages
         id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
