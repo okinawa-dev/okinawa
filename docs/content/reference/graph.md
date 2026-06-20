@@ -28,18 +28,24 @@ g->rebuild();                        // (re)generate geometry after changes
 scene->addObject(g);
 ```
 
+## Render modes
+
+`setRenderMode(...)` picks how it is drawn (then `rebuild()`):
+
+- **`RENDER_LINES`** (default) — edges as `GL_LINES`, nodes as `GL_POINTS`
+  (`setNodeSize`, pixels). Cheap, thin.
+- **`RENDER_POLYGONS`** — edges as filled ribbons (`setEdgeWidth`, metres),
+  nodes as filled quads (`setNodeMarkerSize`, metres). Thicker, more visible,
+  more geometry.
+
+Both honour `setEdgeColor` / `setNodeColor` and `setShowEdges` / `setShowNodes`.
+
 ## How it renders
 
 `OkGraph` is an [object](/reference/items.html) (transform + hierarchy). It does
 not draw geometry itself; `rebuild()` composes internal `OkItem`s attached as
-children:
-
-- **edges** → one item drawn as `GL_LINES`,
-- **nodes** → one item drawn as `GL_POINTS` (size set by `setNodeSize`).
-
-So it reuses the standard item rendering (including per-item colour). Mutate the
-graph and call `rebuild()` to refresh; toggle parts with `setShowEdges` /
-`setShowNodes`.
+children (one for edges, one for nodes), reusing the standard item rendering and
+per-item colour. Mutate the graph and call `rebuild()` to refresh.
 
 ## API
 
@@ -49,7 +55,9 @@ graph and call `rebuild()` to refresh; toggle parts with `setShowEdges` /
 | `addEdge(int a, int b)` | Connect two nodes by index. |
 | `clear()` | Remove all nodes and edges. |
 | `rebuild()` | Regenerate the renderable geometry. |
+| `setRenderMode(RenderMode)` | `RENDER_LINES` or `RENDER_POLYGONS`. |
 | `setEdgeColor` / `setNodeColor` | RGB colours. |
 | `setShowEdges` / `setShowNodes` | Toggle each layer. |
-| `setNodeSize(float)` | Point size in pixels. |
+| `setNodeSize(float)` | Point size in pixels (RENDER_LINES). |
+| `setEdgeWidth(float)` / `setNodeMarkerSize(float)` | Ribbon / quad size in metres (RENDER_POLYGONS). |
 | `getNodeCount` / `getEdgeCount` / `getNode(i)` | Queries. |

@@ -18,6 +18,12 @@ class OkItem;
  */
 class OkGraph : public OkObject {
 public:
+  // How the graph is drawn:
+  // - RENDER_LINES: edges as GL_LINES, nodes as GL_POINTS (cheap, 1px).
+  // - RENDER_POLYGONS: edges as filled ribbons, nodes as filled quads, each in
+  //   its colour (thicker / more visible, more geometry).
+  enum RenderMode { RENDER_LINES, RENDER_POLYGONS };
+
   explicit OkGraph(const std::string &name);
   ~OkGraph() override;
 
@@ -30,11 +36,14 @@ public:
   void rebuild();
 
   // Render options.
+  void setRenderMode(RenderMode mode) { _mode = mode; }
   void setEdgeColor(float r, float g, float b);
   void setNodeColor(float r, float g, float b);
   void setShowEdges(bool show);
   void setShowNodes(bool show);
-  void setNodeSize(float pixels) { _nodeSize = pixels; }
+  void setNodeSize(float pixels) { _nodeSize = pixels; }  // RENDER_LINES points
+  void setEdgeWidth(float meters) { _edgeWidth = meters; }       // RENDER_POLYGONS
+  void setNodeMarkerSize(float meters) { _nodeMarker = meters; }  // RENDER_POLYGONS
 
   // Queries.
   int            getNodeCount() const { return static_cast<int>(_nodes.size()); }
@@ -55,16 +64,21 @@ private:
   std::vector<OkPoint> _nodes;
   std::vector<Edge>    _edges;
 
-  OkItem *_edgesItem;  // GL_LINES, owned
-  OkItem *_nodesItem;  // GL_POINTS, owned
+  OkItem *_edgesItem;  // owned
+  OkItem *_nodesItem;  // owned
 
-  float _edgeColor[3];
-  float _nodeColor[3];
-  bool  _showEdges;
-  bool  _showNodes;
-  float _nodeSize;
+  RenderMode _mode;
+  float      _edgeColor[3];
+  float      _nodeColor[3];
+  bool       _showEdges;
+  bool       _showNodes;
+  float      _nodeSize;    // RENDER_LINES point size (pixels)
+  float      _edgeWidth;   // RENDER_POLYGONS ribbon width (metres)
+  float      _nodeMarker;  // RENDER_POLYGONS node quad size (metres)
 
   void destroyItems();
+  void buildLines();
+  void buildPolygons();
 };
 
 #endif  // OK_GRAPH_HPP
