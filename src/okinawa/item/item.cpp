@@ -29,9 +29,12 @@ OkItem::OkItem(const std::string &name, float *vertexData, long vertexCount,
                              std::to_string(vertexCount) + " vertices and " +
                              std::to_string(indexCount) + " indices");
 
-  visible       = true;
-  drawWireframe = false;
-  drawMode      = GL_TRIANGLES;  // Default drawing mode
+  visible           = true;
+  drawWireframe     = false;
+  drawMode          = GL_TRIANGLES;  // Default drawing mode
+  wireframeColor[0] = 1.0f;
+  wireframeColor[1] = 1.0f;
+  wireframeColor[2] = 1.0f;
 
   numVertices = vertexCount;
   numIndices  = indexCount;
@@ -317,7 +320,8 @@ void OkItem::drawSelf() {
 
     GLint colorLoc = glGetUniformLocation(current_program, "wireframeColor");
     if (colorLoc != -1) {
-      glUniform4f(colorLoc, 1.0f, 1.0f, 1.0f, 1.0f);
+      glUniform4f(colorLoc, wireframeColor[0], wireframeColor[1],
+                  wireframeColor[2], 1.0f);
     }
 
     glDrawElements(drawMode, (GLsizei)numIndices, GL_UNSIGNED_INT, nullptr);

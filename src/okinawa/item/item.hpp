@@ -16,6 +16,9 @@ private:
   bool   drawWireframe;  // Flag to control wireframe rendering
   GLenum drawMode;       // GL_TRIANGLES, GL_LINES, etc.
 
+  // Wireframe line colour (RGB, defaults to white).
+  float wireframeColor[3];
+
   // Geometry
   float        *vertices;
   unsigned int *indices;
@@ -64,6 +67,11 @@ public:
   // Flags
   void   setWireframe(bool wireframe) { drawWireframe = wireframe; }
   bool   getWireframe() const { return drawWireframe; }
+  void   setWireframeColor(float r, float g, float b) {
+    wireframeColor[0] = r;
+    wireframeColor[1] = g;
+    wireframeColor[2] = b;
+  }
   void   setDrawMode(GLenum mode) { drawMode = mode; }
   GLenum getDrawMode() const { return drawMode; }
   void   setVisible(bool visible) { this->visible = visible; }
