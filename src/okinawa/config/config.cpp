@@ -35,6 +35,9 @@ void OkConfig::setDefaults() {
   // Calculate time per frame from FPS
   float timePerFrame = 1000.0f / 60.0f;  // Using hardcoded FPS value
   floatValues["graphics.time-per-frame"] = timePerFrame;
+
+  // Size (half-extent, metres) of the camera gizmo drawn for non-active cameras.
+  floatValues["camera.gizmo-size"] = 0.25f;
   // NOLINTEND(readability-magic-numbers)
 }
 

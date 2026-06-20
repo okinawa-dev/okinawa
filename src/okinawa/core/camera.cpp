@@ -123,8 +123,9 @@ void OkCamera::drawSelf() {
     if (this != OkCore::getCamera()) {
       // Create camera body vertices (cube). All gizmo coordinates are multiples
       // of `size`, so this scales the whole gizmo proportionally about its
-      // centre: 0.25 gives a ~0.5 m cube body.
-      float size       = 0.25f;  // Half-extent of the camera cube (~0.5 m body)
+      // centre (the camera position). Configurable via "camera.gizmo-size"
+      // (default 0.25 -> ~0.5 m cube body).
+      float size       = OkConfig::getFloat("camera.gizmo-size");
       float vertices[] = {
           // Camera body - cube vertices (x, y, z, u, v)
           -size, -size, -size, 0.0f, 0.0f,  // 0
