@@ -32,6 +32,9 @@ OkItem::OkItem(const std::string &name, float *vertexData, long vertexCount,
   visible           = true;
   drawWireframe     = false;
   drawMode          = GL_TRIANGLES;  // Default drawing mode
+  fillColor[0]      = 1.0f;
+  fillColor[1]      = 1.0f;
+  fillColor[2]      = 1.0f;
   wireframeColor[0] = 1.0f;
   wireframeColor[1] = 1.0f;
   wireframeColor[2] = 1.0f;
@@ -286,50 +289,36 @@ void OkItem::drawSelf() {
     return;
   }
 
-  // Draw textured model
-  if (drawTexture) {
+  // Fill pass: textured if we have a texture, otherwise a flat fill colour.
+  // Always runs, so an item can show a flat fill AND a wireframe overlay.
+  {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glActiveTexture(GL_TEXTURE0);
-    texture->bind();
-
-    // Set uniform for texture sampler
-    GLint texLoc = glGetUniformLocation(current_program, "texture0");
-    if (texLoc != -1) {
-      glUniform1i(texLoc, 0);  // Tell shader to use texture unit 0
-    } else {
-      OkLogger::error("Item", "Cannot find texture0 uniform in shader");
-    }
-
-    // Set hasTexture flag
     GLint hasTexLoc = glGetUniformLocation(current_program, "hasTexture");
-    if (hasTexLoc != -1) {
-      glUniform1i(hasTexLoc, 1);
+    if (drawTexture) {
+      glActiveTexture(GL_TEXTURE0);
+      texture->bind();
+      GLint texLoc = glGetUniformLocation(current_program, "texture0");
+      if (texLoc != -1) {
+        glUniform1i(texLoc, 0);
+      }
+      if (hasTexLoc != -1) {
+        glUniform1i(hasTexLoc, 1);
+      }
+    } else {
+      if (hasTexLoc != -1) {
+        glUniform1i(hasTexLoc, 0);
+      }
+      GLint colorLoc = glGetUniformLocation(current_program, "wireframeColor");
+      if (colorLoc != -1) {
+        glUniform4f(colorLoc, fillColor[0], fillColor[1], fillColor[2], 1.0f);
+      }
     }
-
     glDrawElements(drawMode, (GLsizei)numIndices, GL_UNSIGNED_INT, nullptr);
   }
 
-  // Second pass: Draw wireframe
+  // Wireframe overlay pass (in the wireframe colour, on top of the fill).
   if (drawWireframe) {
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-    GLint hasTexLoc = glGetUniformLocation(current_program, "hasTexture");
-    if (hasTexLoc != -1) {
-      glUniform1i(hasTexLoc, 0);
-    }
-
-    GLint colorLoc = glGetUniformLocation(current_program, "wireframeColor");
-    if (colorLoc != -1) {
-      glUniform4f(colorLoc, wireframeColor[0], wireframeColor[1],
-                  wireframeColor[2], 1.0f);
-    }
-
-    glDrawElements(drawMode, (GLsizei)numIndices, GL_UNSIGNED_INT, nullptr);
-  }
-
-  // Fallback if no texture and no wireframe
-  if (!drawTexture && !drawWireframe) {
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     GLint hasTexLoc = glGetUniformLocation(current_program, "hasTexture");
     if (hasTexLoc != -1) {

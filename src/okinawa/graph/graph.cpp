@@ -62,7 +62,8 @@ void OkGraph::setEdgeColor(float r, float g, float b) {
   _edgeColor[1] = g;
   _edgeColor[2] = b;
   if (_edgesItem) {
-    _edgesItem->setWireframeColor(r, g, b);
+    _edgesItem->setFillColor(r, g, b);
+    _edgesItem->setWireframeColor(r * 0.35f, g * 0.35f, b * 0.35f);
   }
 }
 
@@ -71,7 +72,8 @@ void OkGraph::setNodeColor(float r, float g, float b) {
   _nodeColor[1] = g;
   _nodeColor[2] = b;
   if (_nodesItem) {
-    _nodesItem->setWireframeColor(r, g, b);
+    _nodesItem->setFillColor(r, g, b);
+    _nodesItem->setWireframeColor(r * 0.35f, g * 0.35f, b * 0.35f);
   }
 }
 
@@ -125,7 +127,7 @@ void OkGraph::buildLines() {
                             static_cast<long>(verts.size()), edgeIdx.data(),
                             static_cast<long>(edgeIdx.size()));
     _edgesItem->setDrawMode(GL_LINES);
-    _edgesItem->setWireframeColor(_edgeColor[0], _edgeColor[1], _edgeColor[2]);
+    _edgesItem->setFillColor(_edgeColor[0], _edgeColor[1], _edgeColor[2]);
     _edgesItem->setVisible(_showEdges);
     attach(_edgesItem);
   }
@@ -140,7 +142,7 @@ void OkGraph::buildLines() {
                           static_cast<long>(verts.size()), nodeIdx.data(),
                           static_cast<long>(nodeIdx.size()));
   _nodesItem->setDrawMode(GL_POINTS);
-  _nodesItem->setWireframeColor(_nodeColor[0], _nodeColor[1], _nodeColor[2]);
+  _nodesItem->setFillColor(_nodeColor[0], _nodeColor[1], _nodeColor[2]);
   _nodesItem->setVisible(_showNodes);
   attach(_nodesItem);
 }
@@ -187,7 +189,10 @@ void OkGraph::buildPolygons() {
       _edgesItem = new OkItem(getName() + "_edges", ev.data(),
                               static_cast<long>(ev.size()), ei.data(),
                               static_cast<long>(ei.size()));
-      _edgesItem->setWireframeColor(_edgeColor[0], _edgeColor[1], _edgeColor[2]);
+      _edgesItem->setFillColor(_edgeColor[0], _edgeColor[1], _edgeColor[2]);
+      _edgesItem->setWireframe(true);  // outline over the fill
+      _edgesItem->setWireframeColor(_edgeColor[0] * 0.35f, _edgeColor[1] * 0.35f,
+                                    _edgeColor[2] * 0.35f);
       _edgesItem->setVisible(_showEdges);
       attach(_edgesItem);
     }
@@ -221,7 +226,10 @@ void OkGraph::buildPolygons() {
   _nodesItem = new OkItem(getName() + "_nodes", nv.data(),
                           static_cast<long>(nv.size()), ni.data(),
                           static_cast<long>(ni.size()));
-  _nodesItem->setWireframeColor(_nodeColor[0], _nodeColor[1], _nodeColor[2]);
+  _nodesItem->setFillColor(_nodeColor[0], _nodeColor[1], _nodeColor[2]);
+  _nodesItem->setWireframe(true);  // outline over the fill
+  _nodesItem->setWireframeColor(_nodeColor[0] * 0.35f, _nodeColor[1] * 0.35f,
+                                _nodeColor[2] * 0.35f);
   _nodesItem->setVisible(_showNodes);
   attach(_nodesItem);
 }

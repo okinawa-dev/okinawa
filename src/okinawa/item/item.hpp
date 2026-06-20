@@ -16,7 +16,8 @@ private:
   bool   drawWireframe;  // Flag to control wireframe rendering
   GLenum drawMode;       // GL_TRIANGLES, GL_LINES, etc.
 
-  // Wireframe line colour (RGB, defaults to white).
+  // Flat fill colour when untextured, and wireframe line colour (RGB, white).
+  float fillColor[3];
   float wireframeColor[3];
 
   // Geometry
@@ -71,6 +72,11 @@ public:
     wireframeColor[0] = r;
     wireframeColor[1] = g;
     wireframeColor[2] = b;
+  }
+  void   setFillColor(float r, float g, float b) {
+    fillColor[0] = r;
+    fillColor[1] = g;
+    fillColor[2] = b;
   }
   void   setDrawMode(GLenum mode) { drawMode = mode; }
   GLenum getDrawMode() const { return drawMode; }

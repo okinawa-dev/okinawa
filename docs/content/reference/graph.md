@@ -8,9 +8,9 @@ nav_order: 9
 
 `OkGraph` is a generic graph of **nodes and edges** that renders itself. Build it
 with `addNode` / `addEdge`, call `rebuild()`, and add it to the scene. Use it for
-navigation graphs, waypoints, pathfinding debug, and (later) spline/tracker
-paths. The node/edge data stays queryable, so the same graph can drive logic, not
-just visuals.
+navigation graphs, waypoints, or any node/edge structure you want to visualise.
+The node/edge data stays queryable, so the same graph can drive logic, not just
+visuals.
 
 ```cpp
 #include "okinawa/graph/graph.hpp"
