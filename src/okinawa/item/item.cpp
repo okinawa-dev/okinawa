@@ -338,7 +338,8 @@ void OkItem::drawSelf() {
 
     GLint colorLoc = glGetUniformLocation(current_program, "wireframeColor");
     if (colorLoc != -1) {
-      glUniform4f(colorLoc, 1.0f, 1.0f, 1.0f, 1.0f);
+      glUniform4f(colorLoc, wireframeColor[0], wireframeColor[1],
+                  wireframeColor[2], 1.0f);
     }
 
     glDrawElements(drawMode, (GLsizei)numIndices, GL_UNSIGNED_INT, nullptr);
