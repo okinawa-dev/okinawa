@@ -7,7 +7,9 @@
 
 #include "mcp-server.hpp"
 
+#include "../avatar/avatar.hpp"
 #include "../core/core.hpp"  // OkCore + OpenGL / GLFW headers
+#include "../core/object.hpp"
 #include "../input/input.hpp"
 #include "../input/keys.hpp"
 #include "../math/point.hpp"
@@ -318,6 +320,12 @@ struct OkMcpServer::Impl {
     getState["inputSchema"] = {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}};
     tools.push_back(getState);
 
+    json teleport;
+    teleport["name"]        = "teleport";
+    teleport["description"] = "Move the active scene's avatar to world coordinates x,y,z (the avatar's cameras follow). Any omitted field keeps the avatar's current value. Jump to a spot instantly, then use 'look' to aim the camera. Returns the resulting avatar position and camera pose.";
+    teleport["inputSchema"] = {{"type", "object"}, {"properties", {{"x", {{"type", "number"}}}, {"y", {{"type", "number"}}}, {"z", {{"type", "number"}}}}}, {"additionalProperties", false}};
+    tools.push_back(teleport);
+
     return tools;
   }
 
@@ -458,6 +466,40 @@ struct OkMcpServer::Impl {
       });
       state["memory"] = {{"resident_mb", residentMb()}};
       return textResult(state.dump(2));
+    }
+
+    if (name == "teleport") {
+      json err = runOnLoop([args]() -> json {
+        OkAvatar *avatar = OkCore::getActiveAvatar();
+        if (avatar == nullptr) {
+          return json{{"error", "no active avatar"}};
+        }
+        OkObject *obj = avatar->getControlledObject();
+        if (obj == nullptr) {
+          return json{{"error", "avatar has no controlled object"}};
+        }
+        OkPoint p = obj->getPosition();
+        float   x = static_cast<float>(args.value("x", static_cast<double>(p.x())));
+        float   y = static_cast<float>(args.value("y", static_cast<double>(p.y())));
+        float   z = static_cast<float>(args.value("z", static_cast<double>(p.z())));
+        obj->setPosition(x, y, z);
+        return json::object();
+      });
+      if (err.contains("error")) {
+        return errorResult("teleport: " + err["error"].get<std::string>());
+      }
+      // Let the loop run a frame so the rig cameras track the new position.
+      std::this_thread::sleep_for(std::chrono::milliseconds(60));
+      json pose = runOnLoop([]() -> json {
+        json      r      = cameraPoseJson();
+        OkAvatar *avatar = OkCore::getActiveAvatar();
+        if (avatar != nullptr && avatar->getControlledObject() != nullptr) {
+          OkPoint p   = avatar->getControlledObject()->getPosition();
+          r["avatar"] = {{"x", p.x()}, {"y", p.y()}, {"z", p.z()}};
+        }
+        return r;
+      });
+      return textResult("teleported\n" + pose.dump(2));
     }
 
     return errorResult("unknown tool: " + name);
