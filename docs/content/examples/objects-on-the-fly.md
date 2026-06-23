@@ -6,11 +6,11 @@ nav_order: 1
 
 # Objects on the fly
 
-This tutorial creates two `OkItem` cubes at runtime, parents one to the other with `attachTo`, and rotates the parent every frame from the step callback. Because the second cube is a child, it inherits the parent's rotation: spin the parent and the child orbits with it. See [Items](/reference/items.html) for the full transform API.
+This tutorial creates two `OkItem` quads at runtime, parents one to the other with `attachTo`, and rotates the parent every frame from the step callback. Because the second quad is a child, it inherits the parent's rotation: spin the parent and the child orbits with it. See [Items](/reference/items.html) for the full transform API.
 
 ## Build the meshes
 
-An `OkItem` takes interleaved vertex data (position plus UV) and an index buffer. Here a simple quad serves as our "cube" face:
+An `OkItem` takes interleaved vertex data (position plus UV) and an index buffer. Here a simple quad (two triangles) is the whole mesh:
 
 ```cpp
 std::vector<float> vertices = {
@@ -32,13 +32,13 @@ std::vector<unsigned int> indices = {
 Create both items, draw them as wireframe, add the first to the scene and attach the second to the first. Positions set after `attachTo` are relative to the parent.
 
 ```cpp
-OkItem *item = new OkItem("cube", vertices.data(),
+OkItem *item = new OkItem("quad", vertices.data(),
                           static_cast<int>(vertices.size()),
                           indices.data(),
                           static_cast<int>(indices.size()));
 item->setWireframe(true);
 
-OkItem *item2 = new OkItem("cube2", vertices.data(),
+OkItem *item2 = new OkItem("quad2", vertices.data(),
                            static_cast<int>(vertices.size()),
                            indices.data(),
                            static_cast<int>(indices.size()));
@@ -48,7 +48,7 @@ item2->rotate(0.0f, glm::radians(90.0f), 0.0f);
 scene->addObject(item);
 item2->attachTo(item);                 // item2 is now a child of item
 
-item->setPosition(-2.0f, 0.0f, -10.0f);  // left cube, in front of the camera
+item->setPosition(-2.0f, 0.0f, -10.0f);  // left quad, in front of the camera
 item2->setPosition(2.0f, 0.0f, 0.0f);    // relative to the parent
 ```
 
@@ -70,4 +70,4 @@ void stepCallback(float deltaTime) {
 }
 ```
 
-Run the app and you will see the parent cube turning in place with the child cube swinging around it.
+Run the app and you will see the parent quad turning in place with the child quad swinging around it.
