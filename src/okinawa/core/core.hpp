@@ -61,6 +61,11 @@ public:
   // consumes the mouse, otherwise rotates the current camera (free-fly).
   static void applyLook(float yawDeg, float pitchDeg);
 
+  // Apply a zoom delta (mouse-wheel notches; + zooms in, - out) to the current
+  // camera (third-person distance / top-down height). Used by the physical
+  // scroll wheel and the MCP zoom tool; works with physical input disabled.
+  static void applyZoom(float delta);
+
   // Enable the in-engine MCP server so an external agent can connect over
   // local HTTP and drive the app (v1: capture the rendered frame). Binds
   // 127.0.0.1:port. This symbol always exists; if the engine was built
@@ -87,6 +92,8 @@ private:
   static OkAvatar               *_activeAvatar;
 
   static void mouseCallback(GLFWwindow *window, double xpos, double ypos);
+  // Mouse-wheel scroll -> zoom the current camera (yoffset = notches).
+  static void scrollCallback(GLFWwindow *window, double xoffset, double yoffset);
   // Keep the GL viewport matching the (possibly HiDPI) framebuffer size.
   static void framebufferSizeCallback(GLFWwindow *window, int width,
                                       int height);

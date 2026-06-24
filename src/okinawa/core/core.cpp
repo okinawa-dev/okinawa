@@ -91,6 +91,8 @@ bool OkCore::initialize() {
 
   // Initialize input system
   _input = new OkInput(_window, &OkCore::mouseCallback);
+  // Mouse-wheel zoom (camera distance / height); routed like the look callback.
+  glfwSetScrollCallback(_window, &OkCore::scrollCallback);
 
   OkLogger::info("Core", "Engine initialized successfully");
   return true;
@@ -421,6 +423,35 @@ void OkCore::applyLook(float yawDeg, float pitchDeg) {
   OkObject *target =
       _activeAvatar ? _activeAvatar->getControlledObject() : nullptr;
   _cameras[_currentCamera]->updateForTarget(target, 0.0f);
+}
+
+/**
+ * @brief Apply a zoom delta to the current camera (third-person distance /
+ *        top-down height; base camera ignores it) and reposition immediately.
+ *        Used by the physical scroll wheel and the MCP zoom tool.
+ */
+void OkCore::applyZoom(float delta) {
+  if (_cameras.empty()) {
+    return;
+  }
+  _cameras[_currentCamera]->zoom(delta);
+  OkObject *target =
+      _activeAvatar ? _activeAvatar->getControlledObject() : nullptr;
+  _cameras[_currentCamera]->updateForTarget(target, 0.0f);
+}
+
+/**
+ * @brief Mouse-wheel callback: zoom the current camera. Ignored when physical
+ *        input is disabled (--no-input) or the window is not focused, matching
+ *        mouseCallback, so scrolling in another app does not zoom the view.
+ */
+void OkCore::scrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
+  (void)xoffset;
+  if ((_input != nullptr && !_input->isPhysicalInputEnabled()) ||
+      (window != nullptr && glfwGetWindowAttrib(window, GLFW_FOCUSED) == 0)) {
+    return;
+  }
+  applyZoom(static_cast<float>(yoffset));
 }
 
 /**

@@ -18,6 +18,7 @@ public:
 
   void updateForTarget(const OkObject *target, float dt) override;
   void look(float yawDeg, float pitchDeg) override;
+  void zoom(float delta) override;
 
   void setDistance(float distance) { _distance = distance; }
 

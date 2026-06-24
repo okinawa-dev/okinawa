@@ -26,6 +26,10 @@ public:
   // Apply a look delta in degrees (mouse / look equivalent). Base behaviour is
   // free-fly: rotate self with pitch clamped. Subclasses may orbit or ignore.
   virtual void look(float yawDeg, float pitchDeg);
+  // Apply a zoom delta (mouse-wheel notches; + zooms in, - zooms out). Base
+  // ignores it; subclasses pull the orbit closer (third-person distance) or
+  // lower the overhead height (top-down). Repositioned by updateForTarget.
+  virtual void zoom(float delta) { (void)delta; }
 
   // Getters for matrices
   const glm::mat4 &getView() const { return view; }

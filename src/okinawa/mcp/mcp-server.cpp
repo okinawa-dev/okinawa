@@ -308,6 +308,12 @@ struct OkMcpServer::Impl {
     look["inputSchema"] = {{"type", "object"}, {"properties", {{"yaw_deg", {{"type", "number"}}}, {"pitch_deg", {{"type", "number"}}}}}, {"additionalProperties", false}};
     tools.push_back(look);
 
+    json zoom;
+    zoom["name"]        = "zoom";
+    zoom["description"] = "Zoom the active camera by mouse-wheel notches (positive zooms in / closer, negative zooms out / farther): pulls the third-person orbit nearer or lowers the top-down height. Useful to get a closer look at a specific spot. Works with physical input disabled. Returns the resulting camera pose.";
+    zoom["inputSchema"] = {{"type", "object"}, {"properties", {{"delta", {{"type", "number"}, {"description", "Wheel notches; positive zooms in, negative out (e.g. 3 or -2)."}}}}}, {"required", json::array({"delta"})}, {"additionalProperties", false}};
+    tools.push_back(zoom);
+
     json setPose;
     setPose["name"]        = "set_camera_pose";
     setPose["description"] = "Teleport/orient the active camera directly. Any omitted field keeps its current value. Useful to jump to inspect a specific spot. Returns the resulting camera pose.";
@@ -411,6 +417,19 @@ struct OkMcpServer::Impl {
         // Routes to the active avatar's view (orbit) when present, else rotates
         // the current camera directly. Works even with physical input disabled.
         OkCore::applyLook(static_cast<float>(dyaw), static_cast<float>(dpitch));
+        return cameraPoseJson();
+      });
+      return textResult(pose.dump(2));
+    }
+
+    if (name == "zoom") {
+      double delta = args.value("delta", 0.0);
+      json   pose  = runOnLoop([delta]() -> json {
+        OkCamera *cam = OkCore::getCamera();
+        if (cam == nullptr) {
+          return json{{"error", "no active camera"}};
+        }
+        OkCore::applyZoom(static_cast<float>(delta));
         return cameraPoseJson();
       });
       return textResult(pose.dump(2));

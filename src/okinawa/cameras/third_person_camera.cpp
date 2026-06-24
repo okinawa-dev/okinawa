@@ -25,6 +25,15 @@ void OkThirdPersonCamera::look(float yawDeg, float pitchDeg) {
   _pitch               = std::max(minPitch, std::min(maxPitch, _pitch));
 }
 
+void OkThirdPersonCamera::zoom(float delta) {
+  // Multiplicative so it feels even at any distance: each notch in scales the
+  // orbit radius by ~0.88, clamped to a sane range.
+  _distance *= std::pow(0.88f, delta);
+  const float minDist = 2.0f;
+  const float maxDist = 80.0f;
+  _distance           = std::max(minDist, std::min(maxDist, _distance));
+}
+
 void OkThirdPersonCamera::updateForTarget(const OkObject *target, float dt) {
   (void)dt;
   if (target == nullptr) {

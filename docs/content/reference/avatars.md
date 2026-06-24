@@ -61,14 +61,16 @@ of the rendered camera:
 
 ## Cameras
 
-Camera behaviours are `OkCamera` subclasses. `OkCamera` has two virtuals:
+Camera behaviours are `OkCamera` subclasses. `OkCamera` has three virtuals:
 `updateForTarget(target, dt)` (reposition for what it observes; base does
-nothing) and `look(yawDeg, pitchDeg)` (base: free-fly rotate, pitch clamped).
+nothing), `look(yawDeg, pitchDeg)` (base: free-fly rotate, pitch clamped) and
+`zoom(delta)` (mouse-wheel notches; base ignores it). The wheel is routed to the
+current camera via `OkCore::applyZoom` (also exposed as the MCP `zoom` tool).
 
 - **`OkThirdPersonCamera`** — orbits behind/above the target and looks at it;
-  the mouse/look orbits it (pitch clamped).
+  the mouse/look orbits it (pitch clamped), the wheel changes the orbit distance.
 - **`OkTopDownCamera`** — stays straight above the target, perpendicular, north
-  (+Z) up, at a fixed height; follows it; ignores the mouse. Debug/map view.
+  (+Z) up; follows it; ignores the mouse, the wheel changes its height. Debug/map.
 - **`OkFixedCamera`** — static "Resident Evil" camera: fixed world position,
   optionally re-aims at the target. Combine with `setUseActiveCamera` for
   room-relative control.

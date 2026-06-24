@@ -3,11 +3,23 @@
 #include "../core/object.hpp"
 #include "../math/math.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 OkTopDownCamera::OkTopDownCamera(const std::string &name, int width, int height,
                                  float height_m, float fovDegrees)
     : OkCamera(name, width, height) {
   _height = height_m;
   _fov    = fovDegrees;
+}
+
+void OkTopDownCamera::zoom(float delta) {
+  // Multiplicative so it feels even at any altitude: each notch in lowers the
+  // overhead height by ~0.85, clamped to a sane range.
+  _height *= std::pow(0.85f, delta);
+  const float minHeight = 10.0f;
+  const float maxHeight = 1500.0f;
+  _height               = std::max(minHeight, std::min(maxHeight, _height));
 }
 
 void OkTopDownCamera::updateForTarget(const OkObject *target, float dt) {
