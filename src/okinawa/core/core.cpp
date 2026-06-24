@@ -93,6 +93,12 @@ bool OkCore::initialize() {
   _input = new OkInput(_window, &OkCore::mouseCallback);
   // Mouse-wheel zoom (camera distance / height); routed like the look callback.
   glfwSetScrollCallback(_window, &OkCore::scrollCallback);
+  // Release the captured cursor when the window loses focus, so switching/moving
+  // windows frees the OS pointer (recapture happens on the next click in-view).
+  glfwSetWindowFocusCallback(_window, &OkCore::focusCallback);
+  // Click inside the render area captures the cursor for mouse-look (pointer
+  // lock); clicks on OS chrome (title bar) are not delivered here, so they work.
+  glfwSetMouseButtonCallback(_window, &OkCore::mouseButtonCallback);
 
   OkLogger::info("Core", "Engine initialized successfully");
   return true;
@@ -377,10 +383,12 @@ void OkCore::mouseCallback(GLFWwindow *window, double xpos, double ypos) {
   static float lastY      = static_cast<float>(ypos);
   static bool  firstMouse = true;
 
-  // Ignore mouse-look when physical input is disabled (--no-input) or when the
-  // window is not focused, so moving the mouse in another app does not rotate
-  // the view. Re-baseline so refocusing does not cause a sudden jump.
-  if ((_input != nullptr && !_input->isPhysicalInputEnabled()) ||
+  // Ignore mouse-look unless the cursor is captured (pointer lock): physical
+  // input on, window focused, and the user has clicked into the view. So moving
+  // the mouse in another app, or before clicking in, never rotates the view.
+  // Re-baseline whenever not capturing so (re)capturing does not cause a jump.
+  if ((_input != nullptr &&
+       (!_input->isPhysicalInputEnabled() || !_input->isCursorCaptured())) ||
       (window != nullptr && glfwGetWindowAttrib(window, GLFW_FOCUSED) == 0)) {
     firstMouse = true;
     return;
@@ -452,6 +460,22 @@ void OkCore::scrollCallback(GLFWwindow *window, double xoffset, double yoffset) 
     return;
   }
   applyZoom(static_cast<float>(yoffset));
+}
+
+void OkCore::focusCallback(GLFWwindow *window, int focused) {
+  (void)window;
+  if (_input != nullptr) {
+    _input->onWindowFocus(focused != 0);
+  }
+}
+
+void OkCore::mouseButtonCallback(GLFWwindow *window, int button, int action,
+                                 int mods) {
+  (void)window;
+  (void)mods;
+  if (_input != nullptr) {
+    _input->onMouseButton(button, action);
+  }
 }
 
 /**

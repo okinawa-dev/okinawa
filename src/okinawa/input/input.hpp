@@ -80,6 +80,16 @@ public:
   void setPhysicalInputEnabled(bool enabled);
   bool isPhysicalInputEnabled() const { return _physicalEnabled; }
 
+  // Pointer lock. The cursor starts NORMAL (free OS pointer); a click inside the
+  // render area captures it (hidden + locked) for mouse-look; ESC or focus loss
+  // release it. While released, the title bar / OS chrome work normally.
+  void setCursorCaptured(bool captured);
+  bool isCursorCaptured() const { return _cursorCaptured; }
+  // Capture on a left click in the render area (from the mouse-button callback).
+  void onMouseButton(int button, int action);
+  // Release the cursor when the window loses focus (from the focus callback).
+  void onWindowFocus(bool focused);
+
   // Constants
   static constexpr float MOVE_SPEED     = 5.0f;
   static constexpr float ROTATION_SPEED = 2.0f;
@@ -96,6 +106,8 @@ private:
   double        _injectedUntil[OK_KEY_COUNT];
   // When false, physical keyboard/mouse input is ignored (MCP-only control).
   bool          _physicalEnabled;
+  // Pointer lock state: true while the cursor is captured for mouse-look.
+  bool          _cursorCaptured;
 };
 
 #endif

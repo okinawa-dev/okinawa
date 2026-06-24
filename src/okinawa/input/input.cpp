@@ -24,11 +24,13 @@ OkInput::OkInput(GLFWwindow *window, MouseCallback callback) {
   std::memset(_prevKeys, 0, sizeof(_prevKeys));
   std::memset(_injectedUntil, 0, sizeof(_injectedUntil));
   _physicalEnabled = true;
+  _cursorCaptured  = false;
 
   OkLogger::info("Input", "Setting mouse callback...");
   glfwSetCursorPosCallback(window, _mouseCallback);
-  // Hide and capture cursor
-  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  // Pointer lock: start with a normal OS cursor (so the window can be moved /
+  // OS chrome used); a click inside the render area captures it for mouse-look.
+  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 }
 
 /**
@@ -84,8 +86,14 @@ void OkInput::process() {
   _currentState.action3 = isKeyJustPressed(OK_KEY_R);
   _currentState.action4 = isKeyJustPressed(OK_KEY_F);
 
-  // Update exit state (just pressed)
-  _currentState.exit = isKeyJustPressed(OK_KEY_ESCAPE);
+  // ESC: when the cursor is captured (pointer lock), release it instead of
+  // exiting -- browser style. ESC only requests exit when already released.
+  if (isKeyJustPressed(OK_KEY_ESCAPE) && _cursorCaptured) {
+    setCursorCaptured(false);
+    _currentState.exit = false;
+  } else {
+    _currentState.exit = isKeyJustPressed(OK_KEY_ESCAPE);
+  }
 }
 
 /**
@@ -154,9 +162,39 @@ void OkInput::injectKey(OkKey key, double durationSeconds) {
  */
 void OkInput::setPhysicalInputEnabled(bool enabled) {
   _physicalEnabled = enabled;
-  if (_window) {
-    // Release the cursor when ignoring input so it is not captured/hidden.
+  // Pointer lock is opt-in via a click; disabling physical input just makes sure
+  // the cursor is released. It is never auto-captured here.
+  if (!enabled) {
+    setCursorCaptured(false);
+  }
+}
+
+void OkInput::setCursorCaptured(bool captured) {
+  _cursorCaptured = captured;
+  if (_window != nullptr) {
+    // GLFW_CURSOR_DISABLED hides + locks the cursor for raw mouse-look;
+    // GLFW_CURSOR_NORMAL frees the OS pointer (and its acceleration).
     glfwSetInputMode(_window, GLFW_CURSOR,
-                     enabled ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+                     captured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+  }
+}
+
+void OkInput::onMouseButton(int button, int action) {
+  // A left click inside the render area captures the cursor (pointer lock).
+  // GLFW only delivers button events for the content area, so clicks on the
+  // title bar / OS chrome never reach here and keep working normally.
+  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS &&
+      _physicalEnabled && !_cursorCaptured && _window != nullptr &&
+      glfwGetWindowAttrib(_window, GLFW_FOCUSED) != 0) {
+    setCursorCaptured(true);
+  }
+}
+
+void OkInput::onWindowFocus(bool focused) {
+  // Release the cursor whenever the window loses focus, so switching to another
+  // app frees the OS pointer and its acceleration. Recapture is not automatic:
+  // the user clicks back into the view to resume mouse-look.
+  if (!focused) {
+    setCursorCaptured(false);
   }
 }

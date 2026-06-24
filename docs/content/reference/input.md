@@ -18,10 +18,22 @@ nav_order: 7
 | `OkInputState getState() const` | The digested per-frame input state. |
 | `void injectKey(OkKey key, double durationSeconds)` | Synthesize a key press (used to drive the app programmatically). |
 | `void setPhysicalInputEnabled(bool enabled)` | Enable/disable physical keyboard/mouse input. |
+| `void setCursorCaptured(bool captured)` | Capture (hide + lock for mouse-look) or release the OS cursor. |
+| `bool isCursorCaptured() const` | Whether the cursor is currently captured. |
+
+## Mouse cursor (pointer lock)
+
+Mouse-look uses a **pointer-lock** model rather than holding the cursor captured for the whole session:
+
+- The app starts with a **normal OS cursor**, so the window can be moved (title bar), sent to another desktop, and the OS chrome used normally.
+- **Clicking inside the render area captures** the cursor (hidden + locked) and enables mouse-look. Clicks on the title bar / OS chrome are not delivered to the engine, so they keep working.
+- **ESC releases** the cursor (browser style). When the cursor is already released, ESC sets `exit` instead (the app's quit request).
+- **Losing window focus** releases the cursor automatically (frees the OS pointer and, on macOS, restores system-wide mouse acceleration); the user clicks back into the view to resume mouse-look.
+- With physical input disabled (`setPhysicalInputEnabled(false)`, e.g. `--no-input`) the cursor is never captured; drive the view through the MCP `look` tool instead.
 
 ## OkInputState fields
 
-`getState()` returns a struct with ready-to-use flags. Movement: `forward`, `backward`, `strafeLeft`, `strafeRight`. Rotation: `turnLeft`, `turnRight`, `turnUp`, `turnDown`. Edge-triggered actions (true only on the frame first pressed): `action1`, `action2`, `action3`, `action4`. Camera selection: `changeCamera` (-1 if none). And `exit`, set when the user asks to quit.
+`getState()` returns a struct with ready-to-use flags. Movement: `forward`, `backward`, `strafeLeft`, `strafeRight`. Rotation: `turnLeft`, `turnRight`, `turnUp`, `turnDown`. Edge-triggered actions (true only on the frame first pressed): `action1`, `action2`, `action3`, `action4`. Camera selection: `changeCamera` (-1 if none). And `exit`, set when the user asks to quit (ESC while the cursor is already released; a captured cursor consumes ESC to release first).
 
 ## Example
 

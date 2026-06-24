@@ -94,6 +94,11 @@ private:
   static void mouseCallback(GLFWwindow *window, double xpos, double ypos);
   // Mouse-wheel scroll -> zoom the current camera (yoffset = notches).
   static void scrollCallback(GLFWwindow *window, double xoffset, double yoffset);
+  // Window focus changed -> release the captured cursor (see OkInput).
+  static void focusCallback(GLFWwindow *window, int focused);
+  // Mouse button -> click in the render area captures the cursor (pointer lock).
+  static void mouseButtonCallback(GLFWwindow *window, int button, int action,
+                                  int mods);
   // Keep the GL viewport matching the (possibly HiDPI) framebuffer size.
   static void framebufferSizeCallback(GLFWwindow *window, int width,
                                       int height);
