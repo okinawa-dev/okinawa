@@ -10,7 +10,9 @@
 #include "../avatar/avatar.hpp"
 #include "../core/core.hpp"  // OkCore + OpenGL / GLFW headers
 #include "../core/object.hpp"
+#include "../handlers/scenes.hpp"
 #include "../input/input.hpp"
+#include "../item/item.hpp"
 #include "../input/keys.hpp"
 #include "../math/point.hpp"
 #include "../math/rotation.hpp"
@@ -314,6 +316,12 @@ struct OkMcpServer::Impl {
     zoom["inputSchema"] = {{"type", "object"}, {"properties", {{"delta", {{"type", "number"}, {"description", "Wheel notches; positive zooms in, negative out (e.g. 3 or -2)."}}}}}, {"required", json::array({"delta"})}, {"additionalProperties", false}};
     tools.push_back(zoom);
 
+    json setVis;
+    setVis["name"]        = "set_item_visible";
+    setVis["description"] = "Show/hide scene items by name, to isolate geometry. If prefix=true it applies to every item whose name STARTS WITH `name` (e.g. 'building_' or 'sidewalk_' to hide all at once, or 'building_blk52_' to show just one block); otherwise it toggles the single item with that exact name. Returns how many items changed.";
+    setVis["inputSchema"] = {{"type", "object"}, {"properties", {{"name", {{"type", "string"}, {"description", "Item name or, with prefix=true, a name prefix."}}}, {"visible", {{"type", "boolean"}}}, {"prefix", {{"type", "boolean"}, {"description", "Match all names starting with `name` (default false = exact)."}}}}}, {"required", json::array({"name", "visible"})}, {"additionalProperties", false}};
+    tools.push_back(setVis);
+
     json setPose;
     setPose["name"]        = "set_camera_pose";
     setPose["description"] = "Teleport/orient the active camera directly. Any omitted field keeps its current value. Useful to jump to inspect a specific spot. Returns the resulting camera pose.";
@@ -433,6 +441,33 @@ struct OkMcpServer::Impl {
         return cameraPoseJson();
       });
       return textResult(pose.dump(2));
+    }
+
+    if (name == "set_item_visible") {
+      std::string itemName = args.value("name", std::string());
+      bool        vis      = args.value("visible", true);
+      bool        prefix   = args.value("prefix", false);
+      json        r        = runOnLoop([itemName, vis, prefix]() -> json {
+        OkSceneHandler *sh    = OkCore::getSceneHandler();
+        OkScene        *scene = (sh != nullptr) ? sh->getCurrentScene() : nullptr;
+        if (scene == nullptr) {
+          return json{{"error", "no current scene"}};
+        }
+        if (prefix) {
+          std::vector<OkItem *> items = scene->findItems(itemName);
+          for (size_t i = 0; i < items.size(); i++) {
+            items[i]->setVisible(vis);
+          }
+          return json{{"changed", static_cast<int>(items.size())}};
+        }
+        OkItem *it = scene->findItem(itemName);
+        if (it == nullptr) {
+          return json{{"error", "item not found: " + itemName}};
+        }
+        it->setVisible(vis);
+        return json{{"changed", 1}};
+      });
+      return textResult(r.dump(2));
     }
 
     if (name == "set_camera_pose") {

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+class OkItem;
+
 /**
  * @brief Class representing a scene in the application.
  *        It manages a collection of items and their hierarchy.
@@ -25,6 +27,13 @@ public:
   void draw();
   void activate();
   void deactivate();
+
+  // Hierarchy lookup so a caller can address items by name (what the caller
+  // then does with them -- visibility, colour, ... -- is the caller's concern).
+  // findItem: first root OkItem with this exact name (or null).
+  // findItems: every root OkItem whose name starts with `prefix` (empty = all).
+  OkItem               *findItem(const std::string &name) const;
+  std::vector<OkItem *> findItems(const std::string &prefix) const;
 
   // Getters
   bool               isActive() const { return _isActive; }

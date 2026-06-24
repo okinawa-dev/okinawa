@@ -1,4 +1,5 @@
 #include "scene.hpp"
+#include "../item/item.hpp"
 #include "../utils/logger.hpp"
 #include "core/object.hpp"
 #include <cstddef>
@@ -45,6 +46,39 @@ void OkScene::addObject(OkObject *object) {
     OkLogger::warning("Scene",
                       "Cannot add object with parent directly to scene");
   }
+}
+
+/**
+ * @brief Find a root OkItem by exact name (first match), or null.
+ */
+OkItem *OkScene::findItem(const std::string &name) const {
+  for (size_t i = 0; i < rootObjects.size(); ++i) {
+    if (rootObjects[i]->getName() == name) {
+      OkItem *item = dynamic_cast<OkItem *>(rootObjects[i]);
+      if (item != nullptr) {
+        return item;
+      }
+    }
+  }
+  return nullptr;
+}
+
+/**
+ * @brief Every root OkItem whose name starts with `prefix` (empty matches all).
+ */
+std::vector<OkItem *> OkScene::findItems(const std::string &prefix) const {
+  std::vector<OkItem *> out;
+  for (size_t i = 0; i < rootObjects.size(); ++i) {
+    OkItem *item = dynamic_cast<OkItem *>(rootObjects[i]);
+    if (item == nullptr) {
+      continue;
+    }
+    const std::string &nm = item->getName();
+    if (nm.compare(0, prefix.size(), prefix) == 0) {
+      out.push_back(item);
+    }
+  }
+  return out;
 }
 
 /**
