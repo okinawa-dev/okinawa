@@ -21,9 +21,9 @@ The server exposes these tools to a connected agent:
 | `look` | Rotates the active view by `yaw_deg` / `pitch_deg` (the look / mouse-move equivalent): orbits the avatar when an avatar view is active, otherwise rotates the free-fly camera. Works with physical input disabled. Returns the resulting camera pose. |
 | `zoom` | Zooms the active camera by `delta` mouse-wheel notches (positive = in/closer, negative = out/farther): pulls the third-person orbit nearer or lowers the top-down height. The mouse wheel does the same for a human. Works with physical input disabled. Returns the resulting camera pose. |
 | `set_item_visible` | Show/hide scene items by name to isolate geometry. With `prefix: true` it applies to every item whose name starts with `name` (e.g. `building_` / `sidewalk_` to hide all at once, or `building_blk52_` to show one block); otherwise it toggles the single item with that exact `name`. Returns how many items changed. |
-| `set_camera_pose` | Teleports and orients the active camera directly (`x`, `y`, `z`, `pitch_deg`, `yaw_deg`, `roll_deg`); omitted fields keep their current value. Returns the resulting camera pose. Note: avatar views reposition the camera each frame, so to jump the *view* to a spot use `teleport` (moves the avatar) and then `look`. |
+| `set_camera_pose` | Places the active camera at an exact world pose (`x`, `y`, `z`, `pitch_deg`, `yaw_deg`, `roll_deg`; omitted fields keep their current value) and **freezes** it there: the per-frame camera/avatar tracking is suspended for that camera, so the pose holds and any user-left view is exactly reproducible (read it from `get_state`, pass it back). `look`, `zoom` and `teleport` unfreeze it and resume normal tracking. Returns the resulting camera pose. `get_state` reports `pose_frozen`. |
 | `teleport` | Moves the active scene's avatar to world `x`, `y`, `z` (its cameras follow); omitted fields keep the avatar's current value. Jump to a spot instantly, then `look` to aim. Returns the resulting avatar position and camera pose. |
-| `get_state` | Returns numeric runtime state: active camera pose, fps, scene object count, window size and resident memory. |
+| `get_state` | Returns numeric runtime state: active camera pose (incl. `pose_frozen`), fps, scene object count, window size and resident memory. |
 
 ## Enabling it
 

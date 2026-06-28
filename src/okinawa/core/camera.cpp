@@ -26,8 +26,9 @@
 OkCamera::OkCamera(const std::string &name, int width, int height)
     : OkObject(name) {
   // Initialize matrices
-  view       = glm::mat4(1.0f);
-  projection = glm::mat4(1.0f);
+  view           = glm::mat4(1.0f);
+  projection     = glm::mat4(1.0f);
+  _poseOverridden = false;
 
   // Set camera properties
   aspectRatio = (float)width / (float)height;

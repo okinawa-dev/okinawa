@@ -31,6 +31,13 @@ public:
   // lower the overhead height (top-down). Repositioned by updateForTarget.
   virtual void zoom(float delta) { (void)delta; }
 
+  // Pose override: when set, the per-frame updateForTarget is skipped so the
+  // camera HOLDS exactly the pose given over MCP (set_camera_pose), making any
+  // user-left view reproducible. Cleared by look/zoom/teleport (any deliberate
+  // camera or avatar control), which resumes normal tracking.
+  void setPoseOverridden(bool overridden) { _poseOverridden = overridden; }
+  bool isPoseOverridden() const { return _poseOverridden; }
+
   // Getters for matrices
   const glm::mat4 &getView() const { return view; }
   const glm::mat4 &getProjection() const { return projection; }
@@ -52,6 +59,7 @@ private:
   float     fov;
   float     near;
   float     far;
+  bool      _poseOverridden;  // freeze pose (skip updateForTarget) for MCP repro
 
   void updateView();
 };

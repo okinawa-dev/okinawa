@@ -166,6 +166,7 @@ json cameraPoseJson() {
   p["rotation_deg"]  = {{"pitch", radToDeg(rot.getPitch())},
                         {"yaw", radToDeg(rot.getYaw())},
                         {"roll", radToDeg(rot.getRoll())}};
+  p["pose_frozen"]   = cam->isPoseOverridden();
   return p;
 }
 
@@ -324,7 +325,7 @@ struct OkMcpServer::Impl {
 
     json setPose;
     setPose["name"]        = "set_camera_pose";
-    setPose["description"] = "Teleport/orient the active camera directly. Any omitted field keeps its current value. Useful to jump to inspect a specific spot. Returns the resulting camera pose.";
+    setPose["description"] = "Place the active camera at an exact world pose (x,y,z + pitch_deg/yaw_deg/roll_deg) and FREEZE it there, so the per-frame camera controller does not overwrite it -- this reproduces any user-left view exactly (read it from get_state, pass it back here). Any omitted field keeps its current value. look/zoom/teleport unfreeze and resume normal tracking. Returns the resulting camera pose.";
     setPose["inputSchema"] = {{"type", "object"}, {"properties", {{"x", {{"type", "number"}}}, {"y", {{"type", "number"}}}, {"z", {{"type", "number"}}}, {"pitch_deg", {{"type", "number"}}}, {"yaw_deg", {{"type", "number"}}}, {"roll_deg", {{"type", "number"}}}}}, {"additionalProperties", false}};
     tools.push_back(setPose);
 
@@ -493,6 +494,10 @@ struct OkMcpServer::Impl {
                                ? static_cast<float>(degToRad(args["roll_deg"].get<double>()))
                                : rot.getRoll();
         cam->setRotation(pitch, yaw, roll);
+        // Freeze the pose so the per-frame camera controller does not overwrite
+        // it -- this makes the exact pose reproducible. look/zoom/teleport resume
+        // normal tracking.
+        cam->setPoseOverridden(true);
         return cameraPoseJson();
       });
       return textResult(pose.dump(2));
@@ -537,6 +542,10 @@ struct OkMcpServer::Impl {
         float   y = static_cast<float>(args.value("y", static_cast<double>(p.y())));
         float   z = static_cast<float>(args.value("z", static_cast<double>(p.z())));
         obj->setPosition(x, y, z);
+        OkCamera *cam = OkCore::getCamera();  // resume tracking after a teleport
+        if (cam != nullptr) {
+          cam->setPoseOverridden(false);
+        }
         return json::object();
       });
       if (err.contains("error")) {
