@@ -29,7 +29,7 @@ Mouse-look uses a **pointer-lock** model rather than holding the cursor captured
 - **Clicking inside the render area captures** the cursor (hidden + locked) and enables mouse-look. Clicks on the title bar / OS chrome are not delivered to the engine, so they keep working.
 - **ESC releases** the cursor (browser style). When the cursor is already released, ESC sets `exit` instead (the app's quit request).
 - **Losing window focus** releases the cursor automatically (frees the OS pointer and, on macOS, restores system-wide mouse acceleration); the user clicks back into the view to resume mouse-look.
-- With physical input disabled (`setPhysicalInputEnabled(false)`, e.g. `--no-input`) the cursor is never captured; drive the view through the MCP `look` tool instead.
+- With physical input disabled (`setPhysicalInputEnabled(false)`, e.g. `--no-input`) the cursor is never captured; drive the view through the MCP `view` tool instead.
 
 ## OkInputState fields
 

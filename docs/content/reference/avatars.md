@@ -65,7 +65,8 @@ Camera behaviours are `OkCamera` subclasses. `OkCamera` has three virtuals:
 `updateForTarget(target, dt)` (reposition for what it observes; base does
 nothing), `look(yawDeg, pitchDeg)` (base: free-fly rotate, pitch clamped) and
 `zoom(delta)` (mouse-wheel notches; base ignores it). The wheel is routed to the
-current camera via `OkCore::applyZoom` (also exposed as the MCP `zoom` tool).
+current camera via `OkCore::applyZoom`. Agents set the camera absolutely (incl.
+distance) with the single MCP `view` tool instead.
 
 - **`OkThirdPersonCamera`** — orbits behind/above the target and looks at it;
   the mouse/look orbits it (pitch clamped), the wheel changes the orbit distance.
