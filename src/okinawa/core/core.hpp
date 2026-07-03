@@ -66,6 +66,12 @@ public:
   // scroll wheel and the MCP zoom tool; works with physical input disabled.
   static void applyZoom(float delta);
 
+  // The avatar orbit camera (third-person): the one the MCP `view` tool drives.
+  // getOrbitCamera returns it without changing the active camera; activate also
+  // makes it the rendered one. Null if the rig has no orbit camera.
+  static OkCamera *getOrbitCamera();
+  static OkCamera *activateOrbitCamera();
+
   // Enable the in-engine MCP server so an external agent can connect over
   // local HTTP and drive the app (v1: capture the rendered frame). Binds
   // 127.0.0.1:port. This symbol always exists; if the engine was built

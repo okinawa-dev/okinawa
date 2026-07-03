@@ -293,8 +293,7 @@ void OkCore::loop(const OkCoreCallback &stepCallback,
 
       // Let the current camera reposition for what it observes (covers a
       // standalone spectator/fixed camera with no active avatar), then step it.
-      if (!_cameras.empty() &&
-          !_cameras[_currentCamera]->isPoseOverridden()) {
+      if (!_cameras.empty()) {
         OkObject *target =
             _activeAvatar ? _activeAvatar->getControlledObject() : nullptr;
         _cameras[_currentCamera]->updateForTarget(target, dt);
@@ -428,7 +427,6 @@ void OkCore::applyLook(float yawDeg, float pitchDeg) {
   if (_cameras.empty()) {
     return;
   }
-  _cameras[_currentCamera]->setPoseOverridden(false);  // resume tracking
   _cameras[_currentCamera]->look(yawDeg, pitchDeg);
   OkObject *target =
       _activeAvatar ? _activeAvatar->getControlledObject() : nullptr;
@@ -444,11 +442,29 @@ void OkCore::applyZoom(float delta) {
   if (_cameras.empty()) {
     return;
   }
-  _cameras[_currentCamera]->setPoseOverridden(false);  // resume tracking
   _cameras[_currentCamera]->zoom(delta);
   OkObject *target =
       _activeAvatar ? _activeAvatar->getControlledObject() : nullptr;
   _cameras[_currentCamera]->updateForTarget(target, 0.0f);
+}
+
+OkCamera *OkCore::getOrbitCamera() {
+  for (size_t i = 0; i < _cameras.size(); i++) {
+    if (_cameras[i]->isOrbit()) {
+      return _cameras[i];
+    }
+  }
+  return nullptr;
+}
+
+OkCamera *OkCore::activateOrbitCamera() {
+  for (size_t i = 0; i < _cameras.size(); i++) {
+    if (_cameras[i]->isOrbit()) {
+      _currentCamera = static_cast<int>(i);
+      return _cameras[i];
+    }
+  }
+  return _cameras.empty() ? nullptr : _cameras[_currentCamera];
 }
 
 /**

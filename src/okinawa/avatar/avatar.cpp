@@ -30,10 +30,6 @@ void OkAvatar::update(float dt, const OkInputState &input) {
     _controller->update(dt, input, *_controlled);
   }
   for (std::size_t i = 0; i < _cameras.size(); i++) {
-    // Skip cameras whose pose is frozen via MCP (set_camera_pose), so a
-    // reproduced view is not overwritten by avatar tracking.
-    if (!_cameras[i]->isPoseOverridden()) {
-      _cameras[i]->updateForTarget(_controlled, dt);
-    }
+    _cameras[i]->updateForTarget(_controlled, dt);
   }
 }

@@ -57,9 +57,6 @@ const char *const kServerVersion   = "0.1.0";
 double radToDeg(double r) {
   return r * 180.0 / kPi;
 }
-double degToRad(double d) {
-  return d * kPi / 180.0;
-}
 
 // Standard base64 encoder (no external dependency).
 std::string base64Encode(const std::vector<unsigned char> &data) {
@@ -166,8 +163,29 @@ json cameraPoseJson() {
   p["rotation_deg"]  = {{"pitch", radToDeg(rot.getPitch())},
                         {"yaw", radToDeg(rot.getYaw())},
                         {"roll", radToDeg(rot.getRoll())}};
-  p["pose_frozen"]   = cam->isPoseOverridden();
   return p;
+}
+
+// The six numbers the `view` tool takes and reproduces: the avatar position
+// (x,y,z) and the orbit camera angle (yaw_deg, pitch_deg, distance). Pass this
+// object straight back to `view` to restore the exact viewpoint. Loop thread.
+json viewJson() {
+  json      v;
+  OkAvatar *avatar = OkCore::getActiveAvatar();
+  OkObject *obj    = avatar ? avatar->getControlledObject() : nullptr;
+  if (obj != nullptr) {
+    OkPoint p = obj->getPosition();
+    v["x"]    = p.x();
+    v["y"]    = p.y();
+    v["z"]    = p.z();
+  }
+  OkCamera *orb = OkCore::getOrbitCamera();
+  if (orb != nullptr) {
+    v["yaw_deg"]   = orb->orbitYawDeg();
+    v["pitch_deg"] = orb->orbitPitchDeg();
+    v["distance"]  = orb->orbitDistance();
+  }
+  return v;
 }
 
 // MCP tool-result builders.
@@ -305,17 +323,11 @@ struct OkMcpServer::Impl {
     pressKeys["inputSchema"] = {{"type", "object"}, {"properties", {{"keys", {{"type", "array"}, {"items", {{"type", "string"}}}}}, {"duration_ms", {{"type", "number"}}}}}, {"required", json::array({"keys"})}, {"additionalProperties", false}};
     tools.push_back(pressKeys);
 
-    json look;
-    look["name"]        = "look";
-    look["description"] = "Rotate the active view by the given deltas in degrees (the look / move-mouse equivalent): orbits the avatar when an avatar view is active, otherwise rotates the free-fly camera. Works with physical input disabled. Returns the resulting camera pose.";
-    look["inputSchema"] = {{"type", "object"}, {"properties", {{"yaw_deg", {{"type", "number"}}}, {"pitch_deg", {{"type", "number"}}}}}, {"additionalProperties", false}};
-    tools.push_back(look);
-
-    json zoom;
-    zoom["name"]        = "zoom";
-    zoom["description"] = "Zoom the active camera by mouse-wheel notches (positive zooms in / closer, negative zooms out / farther): pulls the third-person orbit nearer or lowers the top-down height. Useful to get a closer look at a specific spot. Works with physical input disabled. Returns the resulting camera pose.";
-    zoom["inputSchema"] = {{"type", "object"}, {"properties", {{"delta", {{"type", "number"}, {"description", "Wheel notches; positive zooms in, negative out (e.g. 3 or -2)."}}}}}, {"required", json::array({"delta"})}, {"additionalProperties", false}};
-    tools.push_back(zoom);
+    json view;
+    view["name"]        = "view";
+    view["description"] = "THE camera tool -- set the whole viewpoint in one call. Places the avatar at x,y,z and the third-person camera around it: yaw_deg = compass facing, pitch_deg = tilt (negative looks DOWN; ~-89 = top-down), distance = metres the camera sits back (= height when top-down). All fields optional; an omitted field keeps its current value. Persistent (survives input, so the user takes over in the same view). get_state returns these same six numbers under `view` -- reproduce any viewpoint by passing them straight back. Returns the resulting view.";
+    view["inputSchema"] = {{"type", "object"}, {"properties", {{"x", {{"type", "number"}}}, {"y", {{"type", "number"}}}, {"z", {{"type", "number"}}}, {"yaw_deg", {{"type", "number"}}}, {"pitch_deg", {{"type", "number"}, {"description", "Tilt; negative looks down, ~-89 is top-down."}}}, {"distance", {{"type", "number"}, {"description", "Camera distance back / height, in metres."}}}}}, {"additionalProperties", false}};
+    tools.push_back(view);
 
     json setVis;
     setVis["name"]        = "set_item_visible";
@@ -323,23 +335,11 @@ struct OkMcpServer::Impl {
     setVis["inputSchema"] = {{"type", "object"}, {"properties", {{"name", {{"type", "string"}, {"description", "Item name or, with prefix=true, a name prefix."}}}, {"visible", {{"type", "boolean"}}}, {"prefix", {{"type", "boolean"}, {"description", "Match all names starting with `name` (default false = exact)."}}}}}, {"required", json::array({"name", "visible"})}, {"additionalProperties", false}};
     tools.push_back(setVis);
 
-    json setPose;
-    setPose["name"]        = "set_camera_pose";
-    setPose["description"] = "Place the active camera at an exact world pose (x,y,z + pitch_deg/yaw_deg/roll_deg) and FREEZE it there, so the per-frame camera controller does not overwrite it -- this reproduces any user-left view exactly (read it from get_state, pass it back here). Any omitted field keeps its current value. look/zoom/teleport unfreeze and resume normal tracking. Returns the resulting camera pose.";
-    setPose["inputSchema"] = {{"type", "object"}, {"properties", {{"x", {{"type", "number"}}}, {"y", {{"type", "number"}}}, {"z", {{"type", "number"}}}, {"pitch_deg", {{"type", "number"}}}, {"yaw_deg", {{"type", "number"}}}, {"roll_deg", {{"type", "number"}}}}}, {"additionalProperties", false}};
-    tools.push_back(setPose);
-
     json getState;
     getState["name"]        = "get_state";
     getState["description"] = "Return numeric runtime state: active camera pose, fps, scene object count, window size and resident memory.";
     getState["inputSchema"] = {{"type", "object"}, {"properties", json::object()}, {"additionalProperties", false}};
     tools.push_back(getState);
-
-    json teleport;
-    teleport["name"]        = "teleport";
-    teleport["description"] = "Move the active scene's avatar to world coordinates x,y,z (the avatar's cameras follow). Any omitted field keeps the avatar's current value. Jump to a spot instantly, then use 'look' to aim the camera. Returns the resulting avatar position and camera pose.";
-    teleport["inputSchema"] = {{"type", "object"}, {"properties", {{"x", {{"type", "number"}}}, {"y", {{"type", "number"}}}, {"z", {{"type", "number"}}}}}, {"additionalProperties", false}};
-    tools.push_back(teleport);
 
     return tools;
   }
@@ -415,33 +415,36 @@ struct OkMcpServer::Impl {
                         "ms\n" + pose.dump(2));
     }
 
-    if (name == "look") {
-      double dyaw   = args.value("yaw_deg", 0.0);
-      double dpitch = args.value("pitch_deg", 0.0);
-      json   pose   = runOnLoop([dyaw, dpitch]() -> json {
-        OkCamera *cam = OkCore::getCamera();
-        if (cam == nullptr) {
-          return json{{"error", "no active camera"}};
+    if (name == "view") {
+      json out = runOnLoop([args]() -> json {
+        OkAvatar *avatar = OkCore::getActiveAvatar();
+        OkObject *obj    = avatar ? avatar->getControlledObject() : nullptr;
+        if (obj != nullptr &&
+            (args.contains("x") || args.contains("y") || args.contains("z"))) {
+          OkPoint p = obj->getPosition();
+          obj->setPosition(
+              static_cast<float>(args.value("x", static_cast<double>(p.x()))),
+              static_cast<float>(args.value("y", static_cast<double>(p.y()))),
+              static_cast<float>(args.value("z", static_cast<double>(p.z()))));
         }
-        // Routes to the active avatar's view (orbit) when present, else rotates
-        // the current camera directly. Works even with physical input disabled.
-        OkCore::applyLook(static_cast<float>(dyaw), static_cast<float>(dpitch));
-        return cameraPoseJson();
-      });
-      return textResult(pose.dump(2));
-    }
-
-    if (name == "zoom") {
-      double delta = args.value("delta", 0.0);
-      json   pose  = runOnLoop([delta]() -> json {
-        OkCamera *cam = OkCore::getCamera();
-        if (cam == nullptr) {
-          return json{{"error", "no active camera"}};
+        OkCamera *orb = OkCore::activateOrbitCamera();
+        if (orb != nullptr && orb->isOrbit() &&
+            (args.contains("yaw_deg") || args.contains("pitch_deg") ||
+             args.contains("distance"))) {
+          float yaw = static_cast<float>(
+              args.value("yaw_deg", static_cast<double>(orb->orbitYawDeg())));
+          float pitch = static_cast<float>(
+              args.value("pitch_deg", static_cast<double>(orb->orbitPitchDeg())));
+          float dist = static_cast<float>(
+              args.value("distance", static_cast<double>(orb->orbitDistance())));
+          orb->setOrbit(yaw, pitch, dist);
         }
-        OkCore::applyZoom(static_cast<float>(delta));
-        return cameraPoseJson();
+        if (orb != nullptr) {
+          orb->updateForTarget(obj, 0.0f);  // apply now; returned view is current
+        }
+        return viewJson();
       });
-      return textResult(pose.dump(2));
+      return textResult(out.dump(2));
     }
 
     if (name == "set_item_visible") {
@@ -471,42 +474,11 @@ struct OkMcpServer::Impl {
       return textResult(r.dump(2));
     }
 
-    if (name == "set_camera_pose") {
-      json pose = runOnLoop([args]() -> json {
-        OkCamera *cam = OkCore::getCamera();
-        if (cam == nullptr) {
-          return json{{"error", "no active camera"}};
-        }
-        OkPoint pos = cam->getPosition();
-        float   x   = static_cast<float>(args.value("x", static_cast<double>(pos.x())));
-        float   y   = static_cast<float>(args.value("y", static_cast<double>(pos.y())));
-        float   z   = static_cast<float>(args.value("z", static_cast<double>(pos.z())));
-        cam->setPosition(x, y, z);
-
-        OkRotation rot   = cam->getRotation();
-        float      pitch = args.contains("pitch_deg")
-                               ? static_cast<float>(degToRad(args["pitch_deg"].get<double>()))
-                               : rot.getPitch();
-        float yaw        = args.contains("yaw_deg")
-                               ? static_cast<float>(degToRad(args["yaw_deg"].get<double>()))
-                               : rot.getYaw();
-        float roll       = args.contains("roll_deg")
-                               ? static_cast<float>(degToRad(args["roll_deg"].get<double>()))
-                               : rot.getRoll();
-        cam->setRotation(pitch, yaw, roll);
-        // Freeze the pose so the per-frame camera controller does not overwrite
-        // it -- this makes the exact pose reproducible. look/zoom/teleport resume
-        // normal tracking.
-        cam->setPoseOverridden(true);
-        return cameraPoseJson();
-      });
-      return textResult(pose.dump(2));
-    }
-
     if (name == "get_state") {
       double measuredFps = fps;
       json   state       = runOnLoop([measuredFps]() -> json {
-        json s = cameraPoseJson();
+        json s    = cameraPoseJson();
+        s["view"] = viewJson();  // the six numbers to pass back to `view`
 
         GLFWwindow *window = OkCore::getWindow();
         int         w      = 0;
@@ -525,44 +497,6 @@ struct OkMcpServer::Impl {
       });
       state["memory"] = {{"resident_mb", residentMb()}};
       return textResult(state.dump(2));
-    }
-
-    if (name == "teleport") {
-      json err = runOnLoop([args]() -> json {
-        OkAvatar *avatar = OkCore::getActiveAvatar();
-        if (avatar == nullptr) {
-          return json{{"error", "no active avatar"}};
-        }
-        OkObject *obj = avatar->getControlledObject();
-        if (obj == nullptr) {
-          return json{{"error", "avatar has no controlled object"}};
-        }
-        OkPoint p = obj->getPosition();
-        float   x = static_cast<float>(args.value("x", static_cast<double>(p.x())));
-        float   y = static_cast<float>(args.value("y", static_cast<double>(p.y())));
-        float   z = static_cast<float>(args.value("z", static_cast<double>(p.z())));
-        obj->setPosition(x, y, z);
-        OkCamera *cam = OkCore::getCamera();  // resume tracking after a teleport
-        if (cam != nullptr) {
-          cam->setPoseOverridden(false);
-        }
-        return json::object();
-      });
-      if (err.contains("error")) {
-        return errorResult("teleport: " + err["error"].get<std::string>());
-      }
-      // Let the loop run a frame so the rig cameras track the new position.
-      std::this_thread::sleep_for(std::chrono::milliseconds(60));
-      json pose = runOnLoop([]() -> json {
-        json      r      = cameraPoseJson();
-        OkAvatar *avatar = OkCore::getActiveAvatar();
-        if (avatar != nullptr && avatar->getControlledObject() != nullptr) {
-          OkPoint p   = avatar->getControlledObject()->getPosition();
-          r["avatar"] = {{"x", p.x()}, {"y", p.y()}, {"z", p.z()}};
-        }
-        return r;
-      });
-      return textResult("teleported\n" + pose.dump(2));
     }
 
     return errorResult("unknown tool: " + name);

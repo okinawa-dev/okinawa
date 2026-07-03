@@ -31,12 +31,20 @@ public:
   // lower the overhead height (top-down). Repositioned by updateForTarget.
   virtual void zoom(float delta) { (void)delta; }
 
-  // Pose override: when set, the per-frame updateForTarget is skipped so the
-  // camera HOLDS exactly the pose given over MCP (set_camera_pose), making any
-  // user-left view reproducible. Cleared by look/zoom/teleport (any deliberate
-  // camera or avatar control), which resumes normal tracking.
-  void setPoseOverridden(bool overridden) { _poseOverridden = overridden; }
-  bool isPoseOverridden() const { return _poseOverridden; }
+  // Orbit interface: a camera that orbits its target (third-person). The MCP
+  // `view` tool drives it absolutely -- yaw/pitch/distance around the avatar --
+  // so any viewpoint is set and reproduced with one call. Base camera is not an
+  // orbit; subclasses override. pitch is the LOOK pitch in degrees (negative =
+  // looking down; -90 ~ top-down).
+  virtual bool  isOrbit() const { return false; }
+  virtual void  setOrbit(float yawDeg, float pitchDeg, float distance) {
+    (void)yawDeg;
+    (void)pitchDeg;
+    (void)distance;
+  }
+  virtual float orbitYawDeg() const { return 0.0f; }
+  virtual float orbitPitchDeg() const { return 0.0f; }
+  virtual float orbitDistance() const { return 0.0f; }
 
   // Getters for matrices
   const glm::mat4 &getView() const { return view; }
@@ -59,7 +67,6 @@ private:
   float     fov;
   float     near;
   float     far;
-  bool      _poseOverridden;  // freeze pose (skip updateForTarget) for MCP repro
 
   void updateView();
 };

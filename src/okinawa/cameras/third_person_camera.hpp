@@ -22,6 +22,13 @@ public:
 
   void setDistance(float distance) { _distance = distance; }
 
+  // Orbit interface (driven by the MCP `view` tool): absolute yaw/pitch/distance.
+  bool  isOrbit() const override { return true; }
+  void  setOrbit(float yawDeg, float pitchDeg, float distance) override;
+  float orbitYawDeg() const override;
+  float orbitPitchDeg() const override;
+  float orbitDistance() const override { return _distance; }
+
 private:
   float _distance;
   float _focusHeight;
