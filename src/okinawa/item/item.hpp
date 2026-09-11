@@ -38,6 +38,9 @@ private:
   // where an instanced item hangs the buffer of where its copies stand
   // -- while the buffers it points at belong to everybody.
   void _initVertexArray(GLuint useVbo, GLuint useEbo);
+  // Where each attribute sits in a vertex, pointed at whatever buffer is
+  // bound when it is called.
+  void _pointAttributes();
 
 protected:
   // Mesh, material and GL state. Protected rather than private because

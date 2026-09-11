@@ -364,10 +364,6 @@ void OkItem::clearMaterials() {
  */
 void OkItem::_initBuffers() {
   // Delete existing OpenGL objects if they exist (safe for updates)
-  if (VAO != 0) {
-    glDeleteVertexArrays(1, &VAO);
-    VAO = 0;
-  }
   if (VBO != 0) {
     glDeleteBuffers(1, &VBO);
     VBO = 0;
@@ -377,11 +373,23 @@ void OkItem::_initBuffers() {
     EBO = 0;
   }
 
+  // The vertex array FIRST, and bound while the buffers are filled.
+  //
+  // Which element buffer is bound is part of a vertex array's state, not
+  // of the context's, so binding one while somebody else's array is
+  // bound replaces THEIRS. Built the other way round -- buffers first,
+  // array after -- an item created while the console was drawing took
+  // the console's element buffer away, and its text came out as a row
+  // of wrong glyphs.
+  _initVertexArray(0, 0);
+  glBindVertexArray(VAO);
+
   glGenBuffers(1, &VBO);
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBufferData(GL_ARRAY_BUFFER,
                static_cast<GLsizeiptr>(numVertices * sizeof(float)), vertices,
                GL_STATIC_DRAW);
+  _pointAttributes();
 
   glGenBuffers(1, &EBO);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
@@ -389,7 +397,34 @@ void OkItem::_initBuffers() {
                static_cast<GLsizeiptr>(numIndices * sizeof(unsigned int)),
                indices, GL_STATIC_DRAW);
 
-  _initVertexArray(VBO, EBO);
+  glBindVertexArray(0);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+/**
+ * @brief Where each attribute lives inside a vertex of the bound buffer.
+ *
+ * Called with this item's vertex array bound and the vertex buffer it
+ * reads from bound too: an attribute pointer remembers which buffer it
+ * was taken from, which is the whole reason the two have to be bound
+ * together.
+ */
+void OkItem::_pointAttributes() {
+  // Position attribute (3 floats)
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, VERTEX_STRIDE * sizeof(float),
+                        nullptr);
+  glEnableVertexAttribArray(0);
+
+  // Texture coords attribute (2 floats)
+  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, VERTEX_STRIDE * sizeof(float),
+                        reinterpret_cast<GLvoid *>(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
+  // Normal attribute (3 floats)
+  glVertexAttribPointer(
+      2, 3, GL_FLOAT, GL_FALSE, VERTEX_STRIDE * sizeof(float),
+      reinterpret_cast<GLvoid *>(VERTEX_NORMAL * sizeof(float)));
+  glEnableVertexAttribArray(2);
 }
 
 /**
@@ -407,31 +442,16 @@ void OkItem::_initVertexArray(GLuint useVbo, GLuint useEbo) {
     VAO = 0;
   }
   glGenVertexArrays(1, &VAO);
+  if (useVbo == 0) {
+    return;  // an empty array, to be filled by the caller that owns it
+  }
   glBindVertexArray(VAO);
-
   glBindBuffer(GL_ARRAY_BUFFER, useVbo);
-
-  // Position attribute (3 floats)
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, VERTEX_STRIDE * sizeof(float),
-                        nullptr);
-  glEnableVertexAttribArray(0);
-
-  // Texture coords attribute (2 floats)
-  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, VERTEX_STRIDE * sizeof(float),
-                        reinterpret_cast<GLvoid *>(3 * sizeof(float)));
-  glEnableVertexAttribArray(1);
-
-  // Normal attribute (3 floats)
-  glVertexAttribPointer(
-      2, 3, GL_FLOAT, GL_FALSE, VERTEX_STRIDE * sizeof(float),
-      reinterpret_cast<GLvoid *>(VERTEX_NORMAL * sizeof(float)));
-  glEnableVertexAttribArray(2);
-
+  _pointAttributes();
   // The element buffer is part of the vertex array's own state, so it is
   // bound while the array is, and left bound: unbinding it here would
   // unbind it from the array as well.
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, useEbo);
-
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }

@@ -96,6 +96,18 @@ OkSharedMesh *OkMeshHandler::acquire(const std::string &key,
   mesh->center[1] = (minY + maxY) * 0.5f;
   mesh->center[2] = (minZ + maxZ) * 0.5f;
 
+  // Uploaded under a vertex array of our own, thrown away afterwards.
+  //
+  // Which element buffer is bound belongs to the bound vertex array, not
+  // to the context: filling one while somebody else's array happened to
+  // be bound would take THEIR element buffer away, and what that looks
+  // like is another object's geometry coming out as nonsense.
+  GLint wasBound = 0;
+  glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &wasBound);
+  GLuint scratch = 0;
+  glGenVertexArrays(1, &scratch);
+  glBindVertexArray(scratch);
+
   glGenBuffers(1, &mesh->vbo);
   glBindBuffer(GL_ARRAY_BUFFER, mesh->vbo);
   glBufferData(GL_ARRAY_BUFFER,
@@ -107,7 +119,8 @@ OkSharedMesh *OkMeshHandler::acquire(const std::string &key,
                static_cast<GLsizeiptr>(mesh->numIndices * sizeof(unsigned int)),
                mesh->indices, GL_STATIC_DRAW);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+  glBindVertexArray(static_cast<GLuint>(wasBound));
+  glDeleteVertexArrays(1, &scratch);
 
   Entry entry;
   entry.mesh     = mesh;
