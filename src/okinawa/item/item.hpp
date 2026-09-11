@@ -39,8 +39,10 @@ private:
   // -- while the buffers it points at belong to everybody.
   void _initVertexArray(GLuint useVbo, GLuint useEbo);
   // Where each attribute sits in a vertex, pointed at whatever buffer is
-  // bound when it is called.
-  void _pointAttributes();
+  // bound when it is called. Static because the layout is the item
+  // class's and not any one item's -- every item reads a vertex the
+  // same way.
+  static void _pointAttributes();
 
 protected:
   // Mesh, material and GL state. Protected rather than private because
