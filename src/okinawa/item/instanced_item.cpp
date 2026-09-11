@@ -26,6 +26,19 @@ OkInstancedItem::OkInstancedItem(const std::string &name, float *vertexData,
   _instanceRadius = 0.0f;
 }
 
+OkInstancedItem::OkInstancedItem(const std::string &name,
+                                 const std::string &meshKey,
+                                 const float *vertexData, long vertexCount,
+                                 const unsigned int *indexData, long indexCount,
+                                 int vertexStride)
+    : OkItem(name, meshKey, vertexData, vertexCount, indexData, indexCount,
+             vertexStride) {
+  _instanceVbo    = 0;
+  _drawnCount     = 0;
+  _instanceCentre = {0.0f, 0.0f, 0.0f};
+  _instanceRadius = 0.0f;
+}
+
 OkInstancedItem::~OkInstancedItem() {
   if (_instanceVbo != 0) {
     glDeleteBuffers(1, &_instanceVbo);

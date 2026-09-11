@@ -284,6 +284,43 @@ is but not how far it reaches. The axes are scaled to the object's own
 radius, since a lamp post and a district cannot share one length and
 both be legible.
 
+## A mesh shared between items
+
+An item owns its geometry: it keeps the vertices in memory and uploads
+buffers of its own. That is right for a mesh drawn once and wrong for a
+drawing that stands in a thousand places, because the same triangles
+then arrive once per item that draws them -- in memory and on the card --
+and each of those uploads is rounded up to a page whether it needs one
+or not.
+
+The constructor that takes a **mesh key** shares instead:
+
+```cpp
+OkItem *lamp = new OkItem("lamp_42", "street_lamp",
+                          verts, vertexCount, idx, indexCount);
+```
+
+The key names the DRAWING, never the drawer: two items asking for
+`street_lamp` mean the same triangles, and an item that put its own name
+in would share nothing with anybody. The first caller uploads; every
+later one gets what is there, so the vertices may be a temporary. The
+store (`OkMeshHandler`) is reference counted like the textures, and the
+geometry goes when the last item drawing it does.
+
+What stays with the item is everything that is about the drawer rather
+than the drawing: its transform, its materials and tints, its
+visibility -- and its own vertex array, which is where an instanced item
+hangs the buffer of where its copies stand. Sharing one of those would
+hand every item the last one's instances.
+
+A shared mesh is read-only: `addMesh` and `updateVertexData` refuse and
+say so, because growing it here would grow it under everybody else
+drawing it.
+
+Measured on one scene of a hundred and twenty thousand repeated pieces:
+12512 groups holding 75 distinct meshes between them went from 800 MB to
+under 100 MB.
+
 ## OkInstancedItem
 
 An instanced item is an `OkItem`, and it draws with the same material
@@ -299,7 +336,8 @@ whatever owns them. Each instance is frustum-tested where it actually
 stands, through that transform.
 
 One mesh drawn many times in a **single** draw call: the base `OkItem` holds
-the shared mesh (uploaded once), and this subclass adds a per-instance
+the mesh (uploaded once, and shareable with other items -- see above),
+and this subclass adds a per-instance
 buffer of world transforms (position, uniform scale, Y rotation) wired
 with an attribute divisor. A thousand copies cost one draw call instead
 of a thousand items, which is what makes large numbers of repeated

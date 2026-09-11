@@ -43,6 +43,19 @@ public:
   OkInstancedItem(const std::string &name, float *vertexData, long vertexCount,
                   unsigned int *indexData, long indexCount,
                   int vertexStride = DEFAULT_VERTEX_STRIDE);
+
+  /**
+   * @brief An instanced item drawing a mesh it shares with others.
+   *
+   * The case this class was made for, really: one drawing standing in
+   * many places. `meshKey` names the drawing -- the piece's own name --
+   * so every group of it anywhere in the world reads the same buffers,
+   * and what each group costs is where its own copies stand.
+   */
+  OkInstancedItem(const std::string &name, const std::string &meshKey,
+                  const float *vertexData, long vertexCount,
+                  const unsigned int *indexData, long indexCount,
+                  int vertexStride = DEFAULT_VERTEX_STRIDE);
   ~OkInstancedItem() override;
 
   /**

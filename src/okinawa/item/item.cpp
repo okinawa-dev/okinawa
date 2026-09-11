@@ -1,6 +1,8 @@
 #include "item.hpp"
+
 #include "../config/config.hpp"
 #include "../core/gl_config.hpp"
+#include "../handlers/meshes.hpp"
 #include "../handlers/textures.hpp"
 #include "../lighting/lighting.hpp"
 #include "../math/frustum.hpp"
@@ -102,9 +104,46 @@ OkItem::OkItem(const std::string &name, float *vertexData, long vertexCount,
   _initBuffers();
 }
 
+OkItem::OkItem(const std::string &name, const std::string &meshKey,
+               const float *vertexData, long vertexCount,
+               const unsigned int *indexData, long indexCount, int vertexStride)
+    : OkObject(name) {
+  _initDefaults();
+  OkSharedMesh *mesh = OkMeshHandler::getInstance()->acquire(
+      meshKey, vertexData, vertexCount, indexData, indexCount, vertexStride);
+  if (mesh == nullptr) {
+    vertices    = nullptr;
+    indices     = nullptr;
+    numVertices = 0;
+    numIndices  = 0;
+    return;
+  }
+  // Borrowed, every one of them: the arrays, the buffers and the extent
+  // the mesh reaches. Nothing here is freed by this item -- see the
+  // destructor, which hands the key back instead.
+  sharedMeshKey = meshKey;
+  vertices      = mesh->vertices;
+  indices       = mesh->indices;
+  numVertices   = mesh->numVertices;
+  numIndices    = mesh->numIndices;
+  radius        = mesh->radius;
+  sphereCenter  = mesh->center;
+  _initVertexArray(mesh->vbo, mesh->ebo);
+}
+
 void OkItem::addMesh(const float *vertexData, long vertexCount,
                      const unsigned int *indexData, long indexCount,
                      const std::string &texturePath, int vertexStride) {
+  if (!sharedMeshKey.empty()) {
+    // Shared geometry belongs to everybody drawing it, so growing it
+    // here would grow it under them. Whoever wants a mesh of their own
+    // has to build it as one.
+    OkLogger::error("Item", "Cannot add a mesh to '" + name +
+                                "': it draws the shared mesh '" +
+                                sharedMeshKey + "'");
+    return;
+  }
+
   if (vertexData == nullptr || indexData == nullptr || vertexCount <= 0 ||
       indexCount <= 0) {
     return;
@@ -118,8 +157,8 @@ void OkItem::addMesh(const float *vertexData, long vertexCount,
   // else's buffer -- not at once, but once enough has been created and
   // freed for the recycling to collide.
   std::vector<float> expanded;
-  _expandVertices(vertexData, vertexCount, indexData, indexCount, vertexStride,
-                  &expanded);
+  expandVertices(vertexData, vertexCount, indexData, indexCount, vertexStride,
+                 &expanded);
   if (expanded.empty()) {
     return;
   }
@@ -194,9 +233,9 @@ void OkItem::upload() {
  * is what lets a mesh be assembled from pieces without creating and
  * destroying buffers per piece.
  */
-void OkItem::_expandVertices(const float *vertexData, long vertexCount,
-                             const unsigned int *indexData, long indexCount,
-                             int vertexStride, std::vector<float> *out) {
+void OkItem::expandVertices(const float *vertexData, long vertexCount,
+                            const unsigned int *indexData, long indexCount,
+                            int vertexStride, std::vector<float> *out) {
   out->clear();
   if (vertexData == nullptr || vertexCount <= 0) {
     return;
@@ -270,8 +309,8 @@ void OkItem::_adoptVertexData(float *vertexData, long vertexCount,
                               const unsigned int *indexData, long indexCount,
                               int vertexStride) {
   std::vector<float> expanded;
-  _expandVertices(vertexData, vertexCount, indexData, indexCount, vertexStride,
-                  &expanded);
+  expandVertices(vertexData, vertexCount, indexData, indexCount, vertexStride,
+                 &expanded);
   if (expanded.empty()) {
     vertices    = nullptr;
     numVertices = 0;
@@ -338,16 +377,39 @@ void OkItem::_initBuffers() {
     EBO = 0;
   }
 
-  // Generate and bind VAO first
-  glGenVertexArrays(1, &VAO);
-  glBindVertexArray(VAO);
-
-  // Generate and set up VBO
   glGenBuffers(1, &VBO);
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBufferData(GL_ARRAY_BUFFER,
                static_cast<GLsizeiptr>(numVertices * sizeof(float)), vertices,
                GL_STATIC_DRAW);
+
+  glGenBuffers(1, &EBO);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+               static_cast<GLsizeiptr>(numIndices * sizeof(unsigned int)),
+               indices, GL_STATIC_DRAW);
+
+  _initVertexArray(VBO, EBO);
+}
+
+/**
+ * @brief The vertex array: what to read, and where each attribute is.
+ *
+ * Its own, always, even when the buffers under it are somebody else's.
+ * A vertex array remembers which buffer each attribute came from, and an
+ * instanced item adds two attributes of its own to it -- where each copy
+ * stands and which way it faces -- so one shared between items would
+ * hand every item the last one's instances.
+ */
+void OkItem::_initVertexArray(GLuint useVbo, GLuint useEbo) {
+  if (VAO != 0) {
+    glDeleteVertexArrays(1, &VAO);
+    VAO = 0;
+  }
+  glGenVertexArrays(1, &VAO);
+  glBindVertexArray(VAO);
+
+  glBindBuffer(GL_ARRAY_BUFFER, useVbo);
 
   // Position attribute (3 floats)
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, VERTEX_STRIDE * sizeof(float),
@@ -365,24 +427,12 @@ void OkItem::_initBuffers() {
       reinterpret_cast<GLvoid *>(VERTEX_NORMAL * sizeof(float)));
   glEnableVertexAttribArray(2);
 
-  // Generate and set up EBO
-  glGenBuffers(1, &EBO);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-               static_cast<GLsizeiptr>(numIndices * sizeof(unsigned int)),
-               indices, GL_STATIC_DRAW);
+  // The element buffer is part of the vertex array's own state, so it is
+  // bound while the array is, and left bound: unbinding it here would
+  // unbind it from the array as well.
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, useEbo);
 
-  // Unbind VAO and VBO (but not EBO while VAO is active)
-  // Unbind VAO first, then VBO and EBO
-  // You can unbind the VAO afterwards so other VAO calls won't accidentally
-  // modify this VAO, but this rarely happens. Modifying other VAOs requires a
-  // call to glBindVertexArray anyways so we generally don't unbind VAOs (nor
-  // VBOs) when it's not directly necessary.
   glBindVertexArray(0);
-
-  // note that this is allowed, the call to glVertexAttribPointer registered
-  // VBO as the vertex attribute's bound vertex buffer object so afterwards we
-  // can safely unbind
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -392,14 +442,19 @@ void OkItem::_initBuffers() {
  *        the item to any vertex.
  */
 OkItem::~OkItem() {
-  // Delete OpenGL objects
+  // The vertex array is this item's whatever else is. The buffers and
+  // the arrays behind them are only this item's when it owns its mesh:
+  // sharing one, it hands the key back and the store frees the geometry
+  // when the last drawer of it is gone.
   glDeleteVertexArrays(1, &VAO);
-  glDeleteBuffers(1, &VBO);
-  glDeleteBuffers(1, &EBO);
-
-  // Free allocated memory
-  delete[] vertices;
-  delete[] indices;
+  if (sharedMeshKey.empty()) {
+    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
+    delete[] vertices;
+    delete[] indices;
+  } else {
+    OkMeshHandler::getInstance()->removeReference(sharedMeshKey);
+  }
 
   // Remove texture reference
   if (texture && !textureName.empty()) {
@@ -981,6 +1036,13 @@ void OkItem::drawDebugHelpers() const {
 }
 
 void OkItem::updateVertexData(float *newVertexData, long newVertexCount) {
+  if (!sharedMeshKey.empty()) {
+    OkLogger::error("Item", "Cannot replace the vertices of '" + name +
+                                "': it draws the shared mesh '" +
+                                sharedMeshKey + "'");
+    return;
+  }
+
   if (!newVertexData || newVertexCount <= 0) {
     OkLogger::error("Item", "Invalid vertex data for update");
     return;

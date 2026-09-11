@@ -31,11 +31,13 @@ public:
   static const int MAT_SLOTS = 3;
 
 private:
-  void        _initBuffers();
-  void        _initDefaults();
-  static void _expandVertices(const float *vertexData, long vertexCount,
-                              const unsigned int *indexData, long indexCount,
-                              int vertexStride, std::vector<float> *out);
+  void _initBuffers();
+  void _initDefaults();
+  // The vertex array object and where its attributes point. Split out
+  // because an item drawing a SHARED mesh needs one of its own -- it is
+  // where an instanced item hangs the buffer of where its copies stand
+  // -- while the buffers it points at belong to everybody.
+  void _initVertexArray(GLuint useVbo, GLuint useEbo);
 
 protected:
   // Mesh, material and GL state. Protected rather than private because
@@ -64,8 +66,12 @@ protected:
   std::array<float, RGB> wireframeColor;
 
   // Geometry
+  // The geometry, which the item may not own: see the shared-mesh
+  // constructor. When it does not, these point into the shared mesh and
+  // the buffers below are its buffers, so neither is freed here.
   float                 *vertices;
   unsigned int          *indices;
+  std::string            sharedMeshKey;
   long                   numVertices;
   long                   numIndices;
   float                  radius;  // bounding-sphere radius (half bbox diagonal)
@@ -135,6 +141,38 @@ public:
   OkItem(const std::string &name, float *vertexData, long vertexCount,
          unsigned int *indexData, long indexCount,
          int vertexStride = VERTEX_STRIDE_IN);
+
+  /**
+   * @brief An item drawing a mesh it does not own.
+   *
+   * For the drawing that stands in a thousand places: a window, a
+   * doorway, a street lamp. The geometry is uploaded once under
+   * `meshKey` and every item naming that key draws the same buffers --
+   * so what a group costs is its transform and its own vertex array,
+   * not another copy of the mesh in memory and another on the card.
+   *
+   * The key must name the DRAWING and not the drawer: two items asking
+   * for "single_door" mean the same triangles, and an item that put its
+   * own name in would share nothing with anybody.
+   *
+   * The vertices are read only on the first call for a key; later ones
+   * get what is already there, so the caller may hand over a temporary.
+   */
+  OkItem(const std::string &name, const std::string &meshKey,
+         const float *vertexData, long vertexCount,
+         const unsigned int *indexData, long indexCount,
+         int vertexStride = VERTEX_STRIDE_IN);
+
+  /**
+   * @brief The caller's layout in, the item's layout out.
+   *
+   * Public and static because the shared-mesh store expands geometry
+   * the same way before uploading it once, and two copies of this
+   * arithmetic would be two answers to what a vertex is.
+   */
+  static void expandVertices(const float *vertexData, long vertexCount,
+                             const unsigned int *indexData, long indexCount,
+                             int vertexStride, std::vector<float> *out);
 
   /**
    * @brief An item with no geometry yet, filled by addMesh().
