@@ -126,7 +126,10 @@ Nothing runs when the process is killed from outside. Nothing can.
 | Method | Purpose |
 | --- | --- |
 | `OkCamera(name, width, height)` | Construct a camera for a given framebuffer size. |
-| `void setPerspective(fovDegrees, near, far)` | Set the projection. |
+| `void setPerspective(fovDegrees, near, far)` | Set the projection: a vanishing point, things further away drawn smaller. |
+| `void setOrthographic(worldHeight, near, far)` | Set the projection to a box `worldHeight` metres tall, the width following the aspect ratio. No vanishing point. |
+| `bool isOrthographic() const` | Which of the two the camera is on. |
+| `float getOrthoHeight() const` | How much of the world fits vertically; changing it with `setOrthographic` is what zooming means in this projection. |
 | `const glm::mat4 &getView() const` | The view matrix. |
 | `const glm::mat4 &getProjection() const` | The projection matrix. |
 | `float viewDistance() const` | How far the camera sits from what it observes (orbit distance, overhead height); `0` when the notion does not apply. |
@@ -135,6 +138,20 @@ Nothing runs when the process is killed from outside. Nothing can.
 | `bool pixelOfPoint(const OkPoint &world, width, height, double *outX, double *outY) const` | Where a world point lands on it, or `false` when the point is behind the camera. |
 
 `OkCamera` also inherits `setPosition`, `setRotation` and the rest of the `OkObject` transform API.
+
+### Two projections, and what zooming means in each
+
+A perspective camera zooms by moving: closer is bigger, because the
+further something is the smaller it is drawn. An orthographic one
+cannot -- there is no vanishing point, so moving towards a thing
+changes nothing about its size. What changes is how much world the
+box holds, which is `setOrthographic`'s first argument, and a camera
+driven the other way appears frozen while its position marches past
+what it is looking at.
+
+`rayThroughPixel` and `pixelOfPoint` work under both without being
+told which: they unproject through the matrix rather than assuming
+rays meet at the eye.
 
 ### Between the screen and the world
 

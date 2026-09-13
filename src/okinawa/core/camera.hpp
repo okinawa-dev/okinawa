@@ -20,6 +20,38 @@ public:
   ~OkCamera() override = default;
   void setPerspective(float fovDegrees, float nearPlane, float farPlane);
 
+  /**
+   * @brief Look through a box instead of through a cone.
+   *
+   * An orthographic camera has no vanishing point: two things the same
+   * size are drawn the same size wherever they stand, and parallel lines
+   * stay parallel. That is what a plan is, and it is what makes an
+   * overhead view worth measuring in -- under perspective the far side
+   * of a square drawn on the ground is shorter than the near side, and
+   * anything squared up against the picture is squared up against the
+   * lens.
+   *
+   * `worldHeight` is how many metres the window covers top to bottom;
+   * the width follows from the aspect ratio. Zooming an orthographic
+   * camera means changing THIS, not moving it: moving it closer changes
+   * nothing at all.
+   *
+   * `rayThroughPixel` needs no special case -- it unprojects through
+   * whatever matrix is in force, so an orthographic ray comes out
+   * parallel to the view instead of fanning from the eye.
+   */
+  void setOrthographic(float worldHeight, float nearPlane, float farPlane);
+
+  /** @brief Whether this camera is looking through a box. */
+  bool isOrthographic() const {
+    return orthographic;
+  }
+
+  /** @brief How many metres the window covers, top to bottom. */
+  float getOrthoHeight() const {
+    return orthoHeight;
+  }
+
   // Reposition this camera for the frame given the entity it observes (may be
   // null). Base camera does not track anything; subclasses (third-person,
   // top-down, fixed, ...) override.
@@ -149,9 +181,14 @@ private:
   glm::mat4 view;
   glm::mat4 projection;
   float     aspectRatio;
-  float     fov;
-  float     near;
-  float     far;
+  // Which projection is in force, and how much world the orthographic
+  // one covers. Kept because a window resize rebuilds the matrix, and a
+  // rebuild that always made a perspective would quietly undo it.
+  bool  orthographic = false;
+  float orthoHeight  = 100.0f;
+  float fov;
+  float near;
+  float far;
 
   void updateView();
 };

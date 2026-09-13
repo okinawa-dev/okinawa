@@ -62,10 +62,28 @@ OkCamera::OkCamera(const std::string &name, int width, int height)
  */
 void OkCamera::setPerspective(float fovDegrees, float nearPlane,
                               float farPlane) {
-  fov        = fovDegrees;
-  near       = nearPlane;
-  far        = farPlane;
-  projection = glm::perspective(glm::radians(fov), aspectRatio, near, far);
+  fov          = fovDegrees;
+  near         = nearPlane;
+  far          = farPlane;
+  orthographic = false;
+  projection   = glm::perspective(glm::radians(fov), aspectRatio, near, far);
+}
+
+/**
+ * @brief Look through a box: see the header for why that is different.
+ */
+void OkCamera::setOrthographic(float worldHeight, float nearPlane,
+                               float farPlane) {
+  // Never zero: a box with no height has no inside, and the matrix
+  // that comes out of it puts every pixel in the same place.
+  const float LEAST_HEIGHT = 0.01f;
+  orthoHeight              = std::max(worldHeight, LEAST_HEIGHT);
+  near                     = nearPlane;
+  far                      = farPlane;
+  orthographic             = true;
+  float half               = orthoHeight * 0.5f;
+  projection = glm::ortho(-half * aspectRatio, half * aspectRatio, -half, half,
+                          near, far);
 }
 
 /**
