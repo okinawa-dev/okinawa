@@ -44,6 +44,7 @@ GLuint                  OkCore::_shaderProgram = 0;
 OkInput                *OkCore::_input         = nullptr;
 OkMcpServer            *OkCore::_mcpServer     = nullptr;
 std::function<void()>   OkCore::_exitCallback;
+std::function<bool()>   OkCore::_closeCallback;
 OkAvatar               *OkCore::_activeAvatar = nullptr;
 OkCore::OkCoreCallback  OkCore::_overlayCallback;
 
@@ -239,6 +240,13 @@ bool OkCore::setWindowIcon(const std::vector<std::string> &pngPaths) {
  */
 void OkCore::setExitCallback(const std::function<void()> &exitCallback) {
   _exitCallback = exitCallback;
+}
+
+/**
+ * @brief Install the close callback (see the header for what it is for).
+ */
+void OkCore::setCloseCallback(const std::function<bool()> &closeCallback) {
+  _closeCallback = closeCallback;
 }
 
 void OkCore::askForExit() {
@@ -716,6 +724,17 @@ void OkCore::loop(const OkCoreCallback &stepCallback,
 
       glfwSwapBuffers(_window);
       glfwPollEvents();
+
+      // A close is a request until the application says otherwise. Asked
+      // here because this is the only point that is after every way of
+      // asking for one -- the window system has just been polled and the
+      // queued tool commands have just run -- and still inside the frame,
+      // where there is a screen to put a question on. The loop's own
+      // condition is not: it is read before any of them.
+      if (_closeCallback && glfwWindowShouldClose(_window) != GLFW_FALSE &&
+          !_closeCallback()) {
+        glfwSetWindowShouldClose(_window, GLFW_FALSE);
+      }
     }
   }
 

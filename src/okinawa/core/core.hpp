@@ -78,6 +78,30 @@ public:
   static void setExitCallback(const std::function<void()> &exitCallback);
 
   /**
+   * @brief Let the application have a say in the window closing.
+   *
+   *        A close is a request, not an event: an application holding
+   *        work nobody has said what to do with has to be able to ask
+   *        before it goes. There is nowhere else to ask from -- the exit
+   *        callback runs with the loop already stopped, which is a frame
+   *        too late to put a question on the screen.
+   *
+   *        Asked once per frame in which a close is pending, after the
+   *        window system has been polled and after any queued tool
+   *        commands have run, so the same answer covers every way out:
+   *        the window's close button, `askForExit()` and the MCP `quit`
+   *        tool. Returning false takes the close back and the loop
+   *        carries on, which is what makes a modal question possible;
+   *        the application asks again by calling `askForExit()` once it
+   *        has its answer.
+   *
+   * @param closeCallback Returns true to let the close through, false to
+   *                      take it back. Set an empty function to remove
+   *                      it, which lets every close through.
+   */
+  static void setCloseCallback(const std::function<bool()> &closeCallback);
+
+  /**
    * @brief Give the window an icon of the application's own.
    *
    *        Pass the same picture at several sizes and the window system
@@ -207,6 +231,7 @@ private:
   static OkAvatar               *_activeAvatar;
   static OkCoreCallback          _overlayCallback;
   static std::function<void()>   _exitCallback;
+  static std::function<bool()>   _closeCallback;
 
   static void mouseCallback(GLFWwindow *window, double xpos, double ypos);
   // Mouse-wheel scroll -> zoom the current camera (yoffset = notches).

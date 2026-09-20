@@ -29,6 +29,7 @@ nav_order: 1
 | `static void setIgnoreUserInput(bool ignore)` | Ignore physical input (MCP-driven instances). |
 | `static void setOverlayCallback(cb)` | Draw over the finished frame, just before the swap. |
 | `static void setExitCallback(cb)` | Run something once when the loop ends, before anything is torn down. |
+| `static void setCloseCallback(cb)` | Say whether a close may go through; `false` takes it back. |
 | `static bool setWindowIcon(const std::vector<std::string> &pngPaths)` | Give the window an icon, from square RGBA PNGs at several sizes. |
 
 The loop callbacks share the signature `void(float deltaTime)`.
@@ -120,6 +121,31 @@ OkCore::setExitCallback([]() {
 ```
 
 Nothing runs when the process is killed from outside. Nothing can.
+
+### Taking a close back
+
+A close is a request, not an event. An application holding something
+nobody has said what to do with — an unsaved document, a half-finished
+upload — has to be able to ask before it goes, and the exit callback is a
+frame too late for that: the loop has already stopped, so there is no
+frame left to put a question on.
+
+`setCloseCallback()` is asked once per frame in which a close is pending,
+after the window system has been polled and after any queued tool
+commands have run, so one answer covers every way out: the close button,
+`askForExit()` and the MCP [`quit` tool](/reference/mcp.html). Return
+`false` and the close is taken back and the loop carries on; the
+application asks again with `askForExit()` once it has its answer.
+
+```cpp
+OkCore::setCloseCallback([]() {
+  if (nothingIsPending()) {
+    return true;
+  }
+  askTheQuestion();   // a modal drawn on the frames that follow
+  return false;
+});
+```
 
 ## OkCamera methods
 
