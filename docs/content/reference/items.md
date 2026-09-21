@@ -63,6 +63,10 @@ parent working out how far its children reach) wants the centre.
 | `void setTexture(const std::string &name, OkTexture *tex)` | Apply an already-loaded texture. The item takes its own reference (see below). |
 | `void setFillColor(float r, float g, float b, float a = 1)` | Untextured fill colour; the alpha is honoured by blended passes (the GUI). |
 | `void setTintColor(float r, float g, float b, float a)` | Multiplied over the texture in the fill pass (white = untouched); how GUI text is coloured. |
+| `void setTintMask(const std::string &path)` | A second texture whose red, green and blue are the weights of material slots 0, 1 and 2 (see below). Empty removes it. |
+| `void setMaterialTint(int slot, float r, float g, float b)` | The colour a slot's zone is tinted with. |
+| `void setMaterialLuminance(int slot, bool on)` | Whether a slot's tint multiplies the texture (off) or replaces its hue and keeps its luminance (on). |
+| `void setAlphaCutout(bool on)` | Read the texture's alpha as coverage and drop pixels under one half (see below). |
 | `void updateVertexData(float *data, long count)` | Replace the vertex data in place (stride-5 contract; normals recomputed against the item's indices). |
 | `float getRadius() const` | The mesh's maximum dimension. |
 | `bool intersectRay(const OkRay &ray, float *outDistance) const` | Whether a ray crosses this item's own triangles, and how far along (see below). |
@@ -247,6 +251,75 @@ OkTextureHandler::getInstance()->removeReference("label");  // item owns it now
 Code that keeps the texture alive for its own use (a sheet, a cached
 atlas) simply keeps its reference and does nothing extra.
 
+### Tint masks and cutouts
+
+One image often has to serve many objects in different colours: the
+same door with a different frame on every house, the same sign lit in
+a different colour at night. Duplicating the image per colour wastes
+memory and multiplies the draws; a **tint mask** recolours zones of one
+image per item instead.
+
+The mask is a second texture, laid over the same texture coordinates as
+the item's own. Its red, green and blue channels are **weights**: how
+much of each pixel belongs to material slot 0, 1 and 2. Each zone takes
+its slot's tint:
+
+```cpp
+item->loadTextureFromFile("assets/door.png");
+item->setTintMask("assets/door-tint.png");
+item->setMaterialTint(0, 0.35f, 0.20f, 0.12f);   // red zone: the frame
+item->setMaterialTint(1, 1.00f, 0.85f, 0.55f);   // green zone: the glass
+item->setMaterialLuminance(1, true);             // lit: the tint is the hue
+```
+
+- **A slot's tint** (`setMaterialTint`) multiplies the drawing within
+  its zone, so the artwork's shading survives: a white tint leaves the
+  zone as drawn.
+- **Luminance mode** (`setMaterialLuminance(slot, true)`) keeps only
+  the drawing's luminance and lets the tint set the hue. That is what
+  an emissive surface wants: the artwork supplies the shading, the tint
+  the colour of the light. Off, the default, the tint multiplies the
+  drawing as it is.
+- **Where the weights add up to less than one**, the rest of the pixel
+  keeps the drawing's own colour, so a mask only needs to paint the
+  zones that change. Where they add up to more, they are scaled back to
+  one.
+
+The mask is loaded like any other texture -- through the texture cache,
+shared between the items that name it, mipmapped and linearly filtered
+-- and the shader samples it with the same filtered lookup as the
+colour, so the drawing and its weights agree at every distance.
+
+**Why weights and not codes.** An easier-looking encoding writes a
+code per pixel -- 0.25 for one zone, 0.5 for the next -- in a single
+channel. A code is a label, and a texture unit does not know that: the
+mipmaps and the linear filter average every pixel with its neighbours,
+and the average of two labels is a third label or none at all. Where
+two zones meet the pixel changes zone, and where a zone meets empty
+space it reads as some other zone or as a hole. A weight survives the
+same filter, because halfway between a pixel that is all one zone and
+one that is all the next really is half of each, which is also the
+colour the eye expects there.
+
+**Alpha cutout.** With `setAlphaCutout(true)` the texture's alpha is
+coverage: a pixel whose filtered alpha is under one half is not drawn.
+That is how a grille, a leaf or a railing is cut out of a quad without
+blending or sorting, and it is independent of the tint mask. Off, which
+is the default, the alpha decides nothing about which pixels are drawn.
+The threshold is half because the filtered edge of a hole crosses it
+halfway between the last covered texel and the first empty one, so the
+cut lands where the drawing put it.
+
+**Padding an atlas.** When several images share one texture, each cell
+has to be padded with copies of its own edge -- colour, alpha and tint
+weights alike -- and never with the atlas background. A filter reaching
+past the cell then reads more of the cell. Padded with background, the
+lower mipmaps mix the cell with the empty space around it, and a solid
+surface seen from afar or at a slant comes out pierced along every
+cell edge. How wide the padding needs to be depends on how far the
+image is seen from: each mipmap level halves it, so a few pixels cover
+the near levels and the far ones still blend neighbouring cells.
+
 ## Debug helpers
 
 Every object can draw a few things **about itself** on top of the thing
@@ -324,8 +397,8 @@ under 100 MB.
 ## OkInstancedItem
 
 An instanced item is an `OkItem`, and it draws with the same material
-state: the texture, the mask flag and the three material tints all
-apply. Every instance wears the same ones -- an instance carries a
+state: the texture, the tint mask, the alpha cutout and the three
+material tints all apply. Every instance wears the same ones -- an instance carries a
 position, a rotation about Y and a scale, and nothing else -- so a
 variation that has to differ between instances is a group of its own.
 
@@ -395,7 +468,10 @@ are kept for that).
 ready for a quad, already accounting for the engine loading textures
 flipped for GL.
 
-### Material masks
+### Material masks (older path)
+
+Superseded by [tint masks and cutouts](#tint-masks-and-cutouts), and
+kept only until nothing uses it; new work should not start here.
 
 A sheet may carry, in its alpha channel, a code saying what each pixel
 *is* rather than how opaque it is. With `OkItem::setMaskedMaterials(true)`
@@ -404,6 +480,9 @@ b)`), so a single sheet serves many colour variants: the same artwork
 recoloured per object, with pixels below the lowest code discarded.
 
 Codes are read as roughly 1.00, 0.50 and 0.25 for slots 0, 1 and 2.
+This is the encoding the section above explains the trouble with: the
+filter averages the codes as numbers, so zones bleed into each other
+and holes open along the edges of a cell, worst at a distance.
 
 **An item drawn from such a sheet must say so, and nothing warns when it
 does not.** Left off, the shader has no way to know the alpha is a code

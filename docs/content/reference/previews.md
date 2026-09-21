@@ -21,7 +21,7 @@ answer** to what an object looks like. The two agree on the day they are
 written and drift afterwards, silently, because both pictures look
 plausible. `OkPreview` puts the object through the engine's own shader,
 so what the preview shows is what the world shows: the same textures,
-the same masked materials, the same tints.
+the same tint masks and cutouts, the same tints.
 
 ## A target to draw into
 

@@ -29,6 +29,15 @@ public:
   static const int RGB       = 3;
   static const int RGBA      = 4;
   static const int MAT_SLOTS = 3;
+  /**
+   * @brief The texture unit a tint mask is bound to in the world pass.
+   *
+   * Unit 0 holds the item's own texture, unit 3 the shadow cascades and
+   * units 4 to 6 the light clusters; the world program samples all of
+   * them in one draw, so the mask needs a unit none of those use. A
+   * unit shared by two samplers of different types fails the draw.
+   */
+  static const int TINT_MASK_UNIT = 1;
 
 private:
   void _initBuffers();
@@ -123,6 +132,13 @@ protected:
   bool                    fadeInverted;  // use the opposite half of the pattern
   std::array<std::array<float, RGB>, MAT_SLOTS> matTint;
   std::array<float, MAT_SLOTS>                  matLuma;
+  // The weights of the three material slots, one per channel of a
+  // second texture; null when the item has none. See setTintMask().
+  OkTexture  *tintMask;
+  std::string tintMaskName;  // path, for reference counting
+  // The texture's alpha is coverage and a pixel under one half is
+  // dropped. See setAlphaCutout().
+  bool alphaCutout;
 
   // Geometry
   void _calculateRadius();
@@ -388,22 +404,94 @@ public:
     unlit = on;
   }
 
-  // Masked materials: when the texture carries a material code in its
-  // alpha channel (instead of opacity), each code takes its own tint,
-  // so one texture serves many colour variants. Codes are read as
-  // ~1.00, ~0.50 and ~0.25; anything below ~0.12 is discarded.
+  /**
+   * @brief The older material mask: a code per pixel in the alpha.
+   *
+   * When the texture carries a material code in its alpha channel
+   * (instead of opacity), each code takes its own tint, so one texture
+   * serves many colour variants. Codes are read as ~1.00, ~0.50 and
+   * ~0.25; anything below ~0.12 is discarded.
+   *
+   * Superseded by setTintMask() and setAlphaCutout(), and kept only
+   * until nothing uses it. A code is a label, and the mipmaps and the
+   * linear filter average labels as numbers: where two codes meet, the
+   * filtered value is a third code or none at all, so zones bleed into
+   * each other and holes open along their edges.
+   */
   void setMaskedMaterials(bool on) {
     maskedMaterials = on;
   }
-  // Per-slot: false multiplies the tint over the texture (keeping its
-  // hue), true keeps only the texture's luminance so the tint sets the
-  // hue -- what an emissive surface wants, where the artwork gives the
-  // shading and the tint gives the colour of the light.
+  /**
+   * @brief Recolour zones of the texture by weight, read from a second
+   *        texture.
+   *
+   * The mask is an image laid over the same texture coordinates as the
+   * item's own texture. Its red, green and blue are how much of each
+   * pixel belongs to material slots 0, 1 and 2, and each zone takes
+   * that slot's tint (setMaterialTint) and luminance mode
+   * (setMaterialLuminance). Where the three add up to less than one,
+   * the rest of the pixel keeps the texture's own colour; above one
+   * they are scaled back to one.
+   *
+   * Weights rather than codes because a texture unit filters: halfway
+   * between a pixel that is all slot 0 and one that is all slot 1 is
+   * half of each, which is also the colour the eye expects there. The
+   * mask is loaded like any texture, mipmapped and linearly filtered,
+   * and shares the texture cache with everything else.
+   *
+   * @param path The mask image; empty removes the mask.
+   */
+  void setTintMask(const std::string &path);
+  /** @brief Path of the tint mask, empty when the item has none. */
+  const std::string &getTintMaskName() const {
+    return tintMaskName;
+  }
+  /** @brief Whether a tint mask is loaded and will be drawn. */
+  bool hasTintMask() const {
+    return tintMask != nullptr;
+  }
+  /**
+   * @brief Read the texture's alpha as coverage, and drop what is not
+   *        covered.
+   *
+   * On, a pixel whose filtered alpha is under one half is not drawn,
+   * which is how a grille, a leaf or a railing is cut out of a quad
+   * without blending or sorting. Off, which is the default, the alpha
+   * takes no part in whether a pixel is drawn.
+   */
+  void setAlphaCutout(bool on) {
+    alphaCutout = on;
+  }
+  /** @brief Whether the texture's alpha is read as a cutout. */
+  bool getAlphaCutout() const {
+    return alphaCutout;
+  }
+  /**
+   * @brief How a slot's tint is applied to its zone.
+   *
+   * False multiplies the tint over the texture, keeping its hue. True
+   * keeps only the texture's luminance so the tint sets the hue --
+   * what an emissive surface wants, where the artwork gives the shading
+   * and the tint gives the colour of the light.
+   */
   void setMaterialLuminance(int slot, bool on) {
     if (slot >= 0 && slot <= 2) {
       matLuma[slot] = on ? 1.0f : 0.0f;
     }
   }
+  /** @brief Whether a slot's tint is applied in luminance mode. */
+  bool getMaterialLuminance(int slot) const {
+    if (slot < 0 || slot > 2) {
+      return false;
+    }
+    return matLuma[slot] > 0.5f;
+  }
+  /**
+   * @brief The colour a material slot's zone is tinted with.
+   *
+   * Applies to the zones of a tint mask, and to the codes of the older
+   * masked materials.
+   */
   void setMaterialTint(int slot, float r, float g, float b) {
     if (slot < 0 || slot > 2) {
       return;
@@ -454,7 +542,8 @@ public:
   /**
    * @brief Send this item's material state to the program in use.
    *
-   * The mask flag and the three material tints. Shared because an
+   * The mask flags, the tint mask and the three material tints.
+   * Shared because an
    * instanced draw needs exactly the same thing an ordinary one does,
    * and for a while it did not send them at all: whatever the last
    * item drawn had left in those uniforms is what the instances came

@@ -58,6 +58,9 @@ void OkItem::_initDefaults() {
   additive        = false;
   unlit           = false;
   maskedMaterials = false;
+  tintMask        = nullptr;
+  tintMaskName    = "";
+  alphaCutout     = false;
   fade            = 1.0f;
   fadeInverted    = false;
   for (int i = 0; i < 3; i++) {
@@ -480,6 +483,9 @@ OkItem::~OkItem() {
   if (texture && !textureName.empty()) {
     OkTextureHandler::getInstance()->removeReference(textureName);
   }
+  if (tintMask && !tintMaskName.empty()) {
+    OkTextureHandler::getInstance()->removeReference(tintMaskName);
+  }
   for (size_t i = 0; i < materials.size(); i++) {
     if (materials[i].texture && !materials[i].textureName.empty()) {
       OkTextureHandler::getInstance()->removeReference(
@@ -599,31 +605,117 @@ void OkItem::updateTransformSelf() {
 }
 
 /**
- * @brief Draw the item and its children.
- * @note  This method handles the rendering of the item and its children.
+ * @brief Load the weights of the material slots from a second texture.
+ *
+ * Goes through the texture handler like any other texture, so a mask
+ * shared by many items is loaded once and freed with the last of them.
  */
-void OkItem::applyMaterialUniforms(unsigned int program) const {
-  GLint maskLoc = glGetUniformLocation(program, "maskedMaterials");
-  if (maskLoc != -1) {
-    glUniform1f(maskLoc, maskedMaterials ? 1.0f : 0.0f);
+void OkItem::setTintMask(const std::string &path) {
+  if (tintMask && !tintMaskName.empty()) {
+    OkTextureHandler::getInstance()->removeReference(tintMaskName);
   }
-  if (!maskedMaterials) {
+  tintMask     = nullptr;
+  tintMaskName = "";
+  if (path.empty()) {
     return;
   }
-  const std::array<const char *, MAT_SLOTS> names = {"matTintA", "matTintB",
-                                                     "matTintC"};
-  for (int i = 0; i < MAT_SLOTS; i++) {
-    GLint loc = glGetUniformLocation(program, names[static_cast<size_t>(i)]);
-    if (loc != -1) {
-      glUniform4f(loc, matTint[i][0], matTint[i][1], matTint[i][2], 1.0f);
-    }
-  }
-  GLint lumaLoc = glGetUniformLocation(program, "matLuminance");
-  if (lumaLoc != -1) {
-    glUniform3f(lumaLoc, matLuma[0], matLuma[1], matLuma[2]);
+  tintMask = OkTextureHandler::getInstance()->createTextureFromFile(path);
+  if (tintMask) {
+    tintMaskName = path;
+  } else {
+    OkLogger::error("Item",
+                    "Could not load tint mask '" + path + "' for item " + name);
   }
 }
 
+namespace {
+
+  /**
+   * @brief Where the material uniforms sit in one program.
+   *
+   * Locations are fixed for the life of a program, and this is sent for
+   * every item drawn: asking for eight names by string per item per
+   * frame is a measurable slice of the frame on its own.
+   */
+  struct MaterialLocations {
+    GLuint                               program;
+    GLint                                masked;
+    GLint                                cutout;
+    GLint                                hasMask;
+    GLint                                maskSampler;
+    std::array<GLint, OkItem::MAT_SLOTS> tints;
+    GLint                                luminance;
+  };
+
+  const MaterialLocations &materialLocations(GLuint program) {
+    static MaterialLocations cache;
+    static bool              filled = false;
+    if (filled && cache.program == program) {
+      return cache;
+    }
+    const std::array<const char *, OkItem::MAT_SLOTS> names = {
+        "matTintA",
+        "matTintB",
+        "matTintC",
+    };
+    cache.program     = program;
+    cache.masked      = glGetUniformLocation(program, "maskedMaterials");
+    cache.cutout      = glGetUniformLocation(program, "alphaCutout");
+    cache.hasMask     = glGetUniformLocation(program, "hasTintMask");
+    cache.maskSampler = glGetUniformLocation(program, "tintMask");
+    for (int i = 0; i < OkItem::MAT_SLOTS; i++) {
+      cache.tints[static_cast<size_t>(i)] =
+          glGetUniformLocation(program, names[static_cast<size_t>(i)]);
+    }
+    cache.luminance = glGetUniformLocation(program, "matLuminance");
+    filled          = true;
+    return cache;
+  }
+
+}  // namespace
+
+void OkItem::applyMaterialUniforms(unsigned int program) const {
+  const MaterialLocations &loc =
+      materialLocations(static_cast<GLuint>(program));
+  // Every flag is written on every draw, set or not: they are program
+  // state, and one left alone is whatever the item drawn before this
+  // one happened to leave there.
+  if (loc.masked != -1) {
+    glUniform1f(loc.masked, maskedMaterials ? 1.0f : 0.0f);
+  }
+  if (loc.cutout != -1) {
+    glUniform1f(loc.cutout, alphaCutout ? 1.0f : 0.0f);
+  }
+  bool useTintMask = tintMask != nullptr && tintMask->isLoaded();
+  if (loc.hasMask != -1) {
+    glUniform1f(loc.hasMask, useTintMask ? 1.0f : 0.0f);
+  }
+  if (useTintMask) {
+    glActiveTexture(static_cast<GLenum>(GL_TEXTURE0 + TINT_MASK_UNIT));
+    tintMask->bind();
+    glActiveTexture(GL_TEXTURE0);
+    if (loc.maskSampler != -1) {
+      glUniform1i(loc.maskSampler, TINT_MASK_UNIT);
+    }
+  }
+  if (!maskedMaterials && !useTintMask) {
+    return;
+  }
+  for (int i = 0; i < MAT_SLOTS; i++) {
+    GLint tintLoc = loc.tints[static_cast<size_t>(i)];
+    if (tintLoc != -1) {
+      glUniform4f(tintLoc, matTint[i][0], matTint[i][1], matTint[i][2], 1.0f);
+    }
+  }
+  if (loc.luminance != -1) {
+    glUniform3f(loc.luminance, matLuma[0], matLuma[1], matLuma[2]);
+  }
+}
+
+/**
+ * @brief Draw the item and its children.
+ * @note  This method handles the rendering of the item and its children.
+ */
 void OkItem::drawSelf() {
   if (!this->visible) {
     // If the item is not visible, skip rendering
