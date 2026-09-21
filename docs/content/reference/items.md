@@ -405,6 +405,15 @@ recoloured per object, with pixels below the lowest code discarded.
 
 Codes are read as roughly 1.00, 0.50 and 0.25 for slots 0, 1 and 2.
 
+**An item drawn from such a sheet must say so, and nothing warns when it
+does not.** Left off, the shader has no way to know the alpha is a code
+and reads it as an opacity, so a pixel coded 0.25 is drawn at a quarter
+strength: a solid surface comes out see-through, which against a bright
+background still looks solid and against a dark one shows whatever is
+behind it. Since the answer belongs to the sheet rather than to each
+piece of geometry, ask it once where the sheet is named, not at every
+call site.
+
 ## OkItemGroup
 
 | Method | Purpose |
