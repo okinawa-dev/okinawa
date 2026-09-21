@@ -96,12 +96,6 @@ uniform float     alphaCutout;
 // drawing put it, and at a distance a mipmap that is half covered keeps
 // half its pixels on either side of the line rather than all or none.
 const float ALPHA_CUTOUT_THRESHOLD = 0.5;
-// The older material mask, kept until nothing uses it: some textures
-// carry, in their alpha channel, a code saying what each pixel is rather
-// than how opaque it is, and with maskedMaterials on each code takes its
-// own tint. A filter averages codes as numbers, so where two meet it
-// reads a third code or none; the tint mask above replaces it.
-uniform float     maskedMaterials;  // 0 = alpha is plain opacity
 // Cross-fade between levels of detail. 1 draws the item whole; below
 // that, a share of its pixels is dropped on an ordered pattern, so two
 // versions of the same thing can hand over gradually without either
@@ -111,9 +105,9 @@ uniform float     itemFade;
 // pattern on both, each keeps the same half and the other half of the
 // screen shows whatever is behind them.
 uniform float     itemFadeInvert;
-uniform vec4      matTintA;         // slot 0: red weight; old code ~1.00
-uniform vec4      matTintB;         // slot 1: green weight; old code ~0.50
-uniform vec4      matTintC;         // slot 2: blue weight; old code ~0.25
+uniform vec4      matTintA;         // slot 0: the mask's red weight
+uniform vec4      matTintB;         // slot 1: the mask's green weight
+uniform vec4      matTintC;         // slot 2: the mask's blue weight
 // Per-slot: 0 multiplies the tint over the texel (keeping its hue),
 // 1 takes only the texel's luminance and lets the tint set the hue.
 // The second is what an emissive surface needs: the artwork supplies
@@ -156,57 +150,35 @@ void main() {
   vec4 color;
   if (hasTexture) {
     vec4 texel = texture(texture0, TexCoord);
-    if (maskedMaterials > 0.5) {
-      // The older path, to be removed once nothing sets maskedMaterials.
-      // Pick the tint whose code is nearest this pixel's mask, and drop
-      // pixels that belong to no material at all.
-      float m = texel.a;
-      if (m < 0.12) {
+    if (alphaCutout > 0.5) {
+      if (texel.a < ALPHA_CUTOUT_THRESHOLD) {
         discard;
       }
-      vec4  tint = matTintC;
-      float luma = matLuminance.z;
-      if (m > 0.75) {
-        tint = matTintA;
-        luma = matLuminance.x;
-      } else if (m > 0.37) {
-        tint = matTintB;
-        luma = matLuminance.y;
-      }
-      float grey = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
-      vec3  base = mix(texel.rgb, vec3(grey), luma);
-      color = vec4(base * tint.rgb, 1.0) * tintColor;
-    } else {
-      if (alphaCutout > 0.5) {
-        if (texel.a < ALPHA_CUTOUT_THRESHOLD) {
-          discard;
-        }
-        // What survives the cut is solid: the alpha was coverage, and
-        // it has been answered.
-        texel.a = 1.0;
-      }
-      if (hasTintMask > 0.5) {
-        // Sampled with the same filtered lookup as the colour, so the
-        // weights and the drawing agree at every distance.
-        vec3  w     = texture(tintMask, TexCoord).rgb;
-        float total = w.r + w.g + w.b;
-        if (total > 1.0) {
-          w /= total;
-          total = 1.0;
-        }
-        float grey  = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
-        vec3  zoneA = mix(texel.rgb, vec3(grey), matLuminance.x) *
-                      matTintA.rgb;
-        vec3  zoneB = mix(texel.rgb, vec3(grey), matLuminance.y) *
-                      matTintB.rgb;
-        vec3  zoneC = mix(texel.rgb, vec3(grey), matLuminance.z) *
-                      matTintC.rgb;
-        // Whatever the weights leave over keeps the drawing's colour.
-        texel.rgb = texel.rgb * (1.0 - total) + zoneA * w.r + zoneB * w.g +
-                    zoneC * w.b;
-      }
-      color = texel * tintColor;
+      // What survives the cut is solid: the alpha was coverage, and
+      // it has been answered.
+      texel.a = 1.0;
     }
+    if (hasTintMask > 0.5) {
+      // Sampled with the same filtered lookup as the colour, so the
+      // weights and the drawing agree at every distance.
+      vec3  w     = texture(tintMask, TexCoord).rgb;
+      float total = w.r + w.g + w.b;
+      if (total > 1.0) {
+        w /= total;
+        total = 1.0;
+      }
+      float grey  = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
+      vec3  zoneA = mix(texel.rgb, vec3(grey), matLuminance.x) *
+                    matTintA.rgb;
+      vec3  zoneB = mix(texel.rgb, vec3(grey), matLuminance.y) *
+                    matTintB.rgb;
+      vec3  zoneC = mix(texel.rgb, vec3(grey), matLuminance.z) *
+                    matTintC.rgb;
+      // Whatever the weights leave over keeps the drawing's colour.
+      texel.rgb = texel.rgb * (1.0 - total) + zoneA * w.r + zoneB * w.g +
+                  zoneC * w.b;
+    }
+    color = texel * tintColor;
   } else {
     color = wireframeColor;
   }

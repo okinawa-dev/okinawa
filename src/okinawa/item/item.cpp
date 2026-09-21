@@ -57,7 +57,6 @@ void OkItem::_initDefaults() {
   sphereCenter[2] = 0.0f;
   additive        = false;
   unlit           = false;
-  maskedMaterials = false;
   tintMask        = nullptr;
   tintMaskName    = "";
   alphaCutout     = false;
@@ -639,7 +638,6 @@ namespace {
    */
   struct MaterialLocations {
     GLuint                               program;
-    GLint                                masked;
     GLint                                cutout;
     GLint                                hasMask;
     GLint                                maskSampler;
@@ -659,7 +657,6 @@ namespace {
         "matTintC",
     };
     cache.program     = program;
-    cache.masked      = glGetUniformLocation(program, "maskedMaterials");
     cache.cutout      = glGetUniformLocation(program, "alphaCutout");
     cache.hasMask     = glGetUniformLocation(program, "hasTintMask");
     cache.maskSampler = glGetUniformLocation(program, "tintMask");
@@ -680,9 +677,6 @@ void OkItem::applyMaterialUniforms(unsigned int program) const {
   // Every flag is written on every draw, set or not: they are program
   // state, and one left alone is whatever the item drawn before this
   // one happened to leave there.
-  if (loc.masked != -1) {
-    glUniform1f(loc.masked, maskedMaterials ? 1.0f : 0.0f);
-  }
   if (loc.cutout != -1) {
     glUniform1f(loc.cutout, alphaCutout ? 1.0f : 0.0f);
   }
@@ -698,7 +692,7 @@ void OkItem::applyMaterialUniforms(unsigned int program) const {
       glUniform1i(loc.maskSampler, TINT_MASK_UNIT);
     }
   }
-  if (!maskedMaterials && !useTintMask) {
+  if (!useTintMask) {
     return;
   }
   for (int i = 0; i < MAT_SLOTS; i++) {
@@ -1109,8 +1103,8 @@ void OkItem::drawDebugHelpers() const {
         std::array<float, RGB> to       = {0.0f, 0.0f, 0.0f};
         int                    u        = (axis + 1) % 3;
         int                    v        = (axis + 2) % 3;
-        float                  su       = (corner & 1) != 0 ? reach : -reach;
-        float                  sv       = (corner & 2) != 0 ? reach : -reach;
+        float                  su       = corner % 2 != 0 ? reach : -reach;
+        float                  sv       = corner / 2 != 0 ? reach : -reach;
         from[static_cast<size_t>(u)]    = su;
         from[static_cast<size_t>(v)]    = sv;
         to[static_cast<size_t>(u)]      = su;
@@ -1129,10 +1123,7 @@ void OkItem::drawDebugHelpers() const {
     // A small cross where the sphere is centred. Small on purpose: it
     // is a point, and a point drawn as long lines is mistaken for the
     // axes it is standing next to.
-    float arm = reach * 0.1f;
-    if (arm < 0.1f) {
-      arm = 0.1f;
-    }
+    float arm = std::max(reach * 0.1f, 0.1f);
     for (int axis = 0; axis < 3; axis++) {
       std::array<float, RGB> from     = {0.0f, 0.0f, 0.0f};
       std::array<float, RGB> to       = {0.0f, 0.0f, 0.0f};

@@ -310,6 +310,29 @@ The threshold is half because the filtered edge of a hole crosses it
 halfway between the last covered texel and the first empty one, so the
 cut lands where the drawing put it.
 
+**A cutout at a distance.** Ordinary mipmaps average coverage away: a
+grille of bars one texel wide in six is a sixth covered, and from the
+level where a texel spans a bar and its gap the average is under one
+half and every bar is dropped. `OkTexture::keepCutoutCoverage()`
+rebuilds the mipmaps so each level passes the cutout over as many
+texels as the full image does, scaling alpha up (never down) and
+averaging colour over the covered texels only; the grille thins with
+distance instead of vanishing. Its second argument keeps the share
+square by square rather than over the whole image, which is what an
+atlas wants: over the whole of it, solid images beside the grille gain
+coverage as their padding spreads, that gain pays for the grille's
+loss, and the grille is dropped anyway.
+
+```cpp
+OkTexture *atlas = OkTextureHandler::getInstance()->getTexture("assets/atlas.png");
+atlas->keepCutoutCoverage(OK_ALPHA_CUTOUT_THRESHOLD, 64);  // 64-texel squares
+OkTextureHandler::getInstance()->removeReference("assets/atlas.png");
+```
+
+It reads the image back from the GPU, so it runs where the context is
+current, once per texture (later calls return at once), and logs what
+it cost.
+
 **Padding an atlas.** When several images share one texture, each cell
 has to be padded with copies of its own edge -- colour, alpha and tint
 weights alike -- and never with the atlas background. A filter reaching
@@ -317,8 +340,28 @@ past the cell then reads more of the cell. Padded with background, the
 lower mipmaps mix the cell with the empty space around it, and a solid
 surface seen from afar or at a slant comes out pierced along every
 cell edge. How wide the padding needs to be depends on how far the
-image is seen from: each mipmap level halves it, so a few pixels cover
-the near levels and the far ones still blend neighbouring cells.
+image is seen from: each level doubles how far the filter reaches, so
+a padding of `p` pixels keeps level `L` inside the cell while
+`1.5 * 2^L - 0.5 <= p` -- 8 pixels cover levels 0 to 2, 24 cover 0 to
+4. Past that, the far levels blend neighbouring cells again, and
+`OkTexture::setMaxMipLevel(L)` stops the chain at the last level the
+padding covers: a little aliasing at a great distance instead of
+colours bleeding across and holes along every edge.
+
+```cpp
+OkTexture *atlas = OkTextureHandler::getInstance()->getTexture("assets/atlas.png");
+atlas->setMaxMipLevel(4);   // padded 24 px: levels 0..4 stay in their cell
+OkTextureHandler::getInstance()->removeReference("assets/atlas.png");
+```
+
+**Say it where the texture is named.** Neither the cutout nor the tint
+mask can be read off the image: the shader is told, per item, and an
+item that is not told reads the alpha as nothing and draws the texture
+as it is, holes filled with whatever colour the empty pixels carry.
+Since the answer belongs to the texture rather than to each piece of
+geometry drawn with it, keep it in one place beside the texture's name
+and have every item ask there, rather than setting it at every call
+site where one of them can forget.
 
 ## Debug helpers
 
@@ -467,31 +510,6 @@ are kept for that).
 `OkSpriteRegion` carries `x, y, w, h` in pixels and `u0, v0, u1, v1`
 ready for a quad, already accounting for the engine loading textures
 flipped for GL.
-
-### Material masks (older path)
-
-Superseded by [tint masks and cutouts](#tint-masks-and-cutouts), and
-kept only until nothing uses it; new work should not start here.
-
-A sheet may carry, in its alpha channel, a code saying what each pixel
-*is* rather than how opaque it is. With `OkItem::setMaskedMaterials(true)`
-the shader gives each code its own tint (`setMaterialTint(slot, r, g,
-b)`), so a single sheet serves many colour variants: the same artwork
-recoloured per object, with pixels below the lowest code discarded.
-
-Codes are read as roughly 1.00, 0.50 and 0.25 for slots 0, 1 and 2.
-This is the encoding the section above explains the trouble with: the
-filter averages the codes as numbers, so zones bleed into each other
-and holes open along the edges of a cell, worst at a distance.
-
-**An item drawn from such a sheet must say so, and nothing warns when it
-does not.** Left off, the shader has no way to know the alpha is a code
-and reads it as an opacity, so a pixel coded 0.25 is drawn at a quarter
-strength: a solid surface comes out see-through, which against a bright
-background still looks solid and against a dark one shows whatever is
-behind it. Since the answer belongs to the sheet rather than to each
-piece of geometry, ask it once where the sheet is named, not at every
-call site.
 
 ## OkItemGroup
 

@@ -127,7 +127,6 @@ protected:
 
   // Multiplies the texture in the fill pass.
   std::array<float, RGBA> tintColor;
-  bool                    maskedMaterials;
   float                   fade;          // 1 = solid; below that, dithered away
   bool                    fadeInverted;  // use the opposite half of the pattern
   std::array<std::array<float, RGB>, MAT_SLOTS> matTint;
@@ -405,23 +404,6 @@ public:
   }
 
   /**
-   * @brief The older material mask: a code per pixel in the alpha.
-   *
-   * When the texture carries a material code in its alpha channel
-   * (instead of opacity), each code takes its own tint, so one texture
-   * serves many colour variants. Codes are read as ~1.00, ~0.50 and
-   * ~0.25; anything below ~0.12 is discarded.
-   *
-   * Superseded by setTintMask() and setAlphaCutout(), and kept only
-   * until nothing uses it. A code is a label, and the mipmaps and the
-   * linear filter average labels as numbers: where two codes meet, the
-   * filtered value is a third code or none at all, so zones bleed into
-   * each other and holes open along their edges.
-   */
-  void setMaskedMaterials(bool on) {
-    maskedMaterials = on;
-  }
-  /**
    * @brief Recolour zones of the texture by weight, read from a second
    *        texture.
    *
@@ -489,8 +471,8 @@ public:
   /**
    * @brief The colour a material slot's zone is tinted with.
    *
-   * Applies to the zones of a tint mask, and to the codes of the older
-   * masked materials.
+   * Applies to the zones of a tint mask (setTintMask); an item with no
+   * mask ignores it.
    */
   void setMaterialTint(int slot, float r, float g, float b) {
     if (slot < 0 || slot > 2) {
