@@ -14,7 +14,7 @@ nav_order: 1
 
 | Method | Purpose |
 | --- | --- |
-| `static bool initialize()` | Create the window and OpenGL context. Returns false on failure. |
+| `static bool initialize()` | Create the window and OpenGL context. Returns false on failure. The window is brought inside the desktop's usable area, frame included (see below). |
 | `static void loop(step, draw)` | Run the main loop, calling the step and draw callbacks each frame. |
 | `static void askForExit()` | Request the loop to end (typically from the step callback). |
 | `static void exit()` | Tear down and exit. |
@@ -215,3 +215,23 @@ camera->setPerspective(45.0f, 0.1f, 1000.0f);
 
 OkCore::loop(stepCallback, drawCallback);
 ```
+
+## A window is opened at a size the screen can show
+
+`window.width` and `window.height` ask for the size of what the
+application DRAWS. What the desktop has to find room for is that plus
+the window's frame -- the title bar above it and whatever the platform
+puts around the rest -- so a window asked for at exactly the usable
+height opens with its lower edge, and everything drawn along it, below
+the bottom of the screen. It cannot be dragged back into view either:
+the title bar is the handle, and the title bar is the part that is
+still on screen.
+
+So once the window exists, `initialize()` measures its frame, compares
+it against the monitor's usable area and, where it does not fit, sets
+the drawn size to what is left and moves the window under the frame at
+the area's own corner. A window that already fits is left exactly as it
+was asked for, so the same configuration opens at the size requested on
+a large screen and shrinks only where it has to. The frame can only be
+measured once there is a window, which is why this happens after one is
+made rather than being subtracted from the size asked for.

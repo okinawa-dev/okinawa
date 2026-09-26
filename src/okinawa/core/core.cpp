@@ -306,6 +306,63 @@ void OkCore::exit() {
 }
 
 /**
+ * @brief Bring the window inside what the screen can show, frame and all.
+ *
+ * A window is asked for by the size of what it DRAWS, and what the
+ * screen has to find room for is that plus its frame: the title bar
+ * above it, and whatever the platform puts around the rest. So a window
+ * asked for at exactly the usable height opens with its lower edge --
+ * and everything an application draws along it -- past the bottom of
+ * the screen, where the frame's own thickness pushed it. It cannot be
+ * dragged back: the title bar is the handle and it is still on screen.
+ *
+ * The frame can only be measured once there is a window, which is why
+ * this runs after one is made rather than being taken off the size
+ * asked for. A window that already fits is left exactly as it is.
+ */
+void OkCore::fitWindowToScreen() {
+  if (_window == nullptr) {
+    return;
+  }
+  GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+  if (monitor == nullptr) {
+    return;
+  }
+  int areaX = 0;
+  int areaY = 0;
+  int areaW = 0;
+  int areaH = 0;
+  glfwGetMonitorWorkarea(monitor, &areaX, &areaY, &areaW, &areaH);
+  if (areaW <= 0 || areaH <= 0) {
+    return;  // no desktop to fit into: leave the window alone
+  }
+  int left   = 0;
+  int top    = 0;
+  int right  = 0;
+  int bottom = 0;
+  glfwGetWindowFrameSize(_window, &left, &top, &right, &bottom);
+  int roomW  = areaW - left - right;
+  int roomH  = areaH - top - bottom;
+  int width  = 0;
+  int height = 0;
+  glfwGetWindowSize(_window, &width, &height);
+  if (width > roomW || height > roomH) {
+    int fitW = width > roomW ? roomW : width;
+    int fitH = height > roomH ? roomH : height;
+    OkLogger::info("Core", "Window " + std::to_string(width) + "x" +
+                               std::to_string(height) +
+                               " does not fit this screen with its frame; "
+                               "opening at " +
+                               std::to_string(fitW) + "x" +
+                               std::to_string(fitH));
+    glfwSetWindowSize(_window, fitW, fitH);
+  }
+  // And inside the usable area, under the frame: a window the platform
+  // placed before it was resized can still have its top out of reach.
+  glfwSetWindowPos(_window, areaX + left, areaY + top);
+}
+
+/**
  * @brief Initialize OpenGL context and window.
  *        This method sets up the GLFW window and OpenGL context.
  * @param width  The width of the window.
@@ -337,6 +394,8 @@ bool OkCore::initializeOpenGL(int width, int height) {
     glfwTerminate();
     return false;
   }
+
+  fitWindowToScreen();
 
   glfwMakeContextCurrent(_window);
 

@@ -219,6 +219,12 @@ public:
 
 private:
   static bool initializeOpenGL(int width, int height);
+
+  /**
+   * @brief Bring the window inside what the screen can show, frame and
+   *        all, once there is a window to measure the frame of.
+   */
+  static void fitWindowToScreen();
   static bool initializeShaders();
 
   static GLFWwindow             *_window;
