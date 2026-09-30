@@ -131,6 +131,21 @@ public:
                              int height, std::vector<unsigned char> &dst,
                              int &outWidth, int &outHeight);
 
+  /**
+   * @brief Read the texture's file again and replace its pixels with it.
+   *
+   * The cache hands every item that asked for a path the same texture, so
+   * a file rewritten while the application runs would otherwise keep
+   * showing what it held when it was first loaded. The handle stays the
+   * same, so every item drawing it shows the new image on its next frame.
+   * The size may change; the mipmaps are rebuilt. A cutout whose coverage
+   * was kept gets plain mipmaps back: call `keepCutoutCoverage` again.
+   *
+   * @return false for a texture made from raw data, or when the file can
+   *         no longer be read, in which case the old pixels are kept.
+   */
+  bool reload();
+
   // Replace the pixel data in place (same size and channel count the
   // texture was created with). RGBA/RGB raw data, no mipmap rebuild.
   void updateRawData(const unsigned char *data, int newWidth,

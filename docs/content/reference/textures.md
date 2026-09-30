@@ -44,6 +44,19 @@ Useful queries: `isLoaded()`, `getWidth()`, `getHeight()`, `getChannels()`,
 `getPath()`. `OkTexture` is non-copyable (it owns a GL handle); pass it by
 pointer. `bind()` / `OkTexture::unbind()` are used by the renderer.
 
+`reload()` reads a file-backed texture's file again and replaces its pixels,
+keeping the same handle, so every item sharing it shows the new image on the
+next frame. Use it when a tool rewrites an image while the application runs:
+the cache would otherwise keep serving the first version. The size may change
+and the mipmaps are rebuilt.
+
+```cpp
+OkTexture *tex = OkTextureHandler::getInstance()->getTexture("assets/tile.png");
+if (tex != nullptr) {
+  tex->reload();
+}
+```
+
 ## Caching
 
 Textures are cached and reference-counted by **OkTextureHandler**, a singleton:
