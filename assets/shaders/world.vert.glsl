@@ -18,6 +18,12 @@ layout(location = 2) in vec3 aNormal;
 // instance instead of once per vertex.
 layout(location = 3) in vec4 aInstPosScale;
 layout(location = 4) in vec4 aInstOrient;
+// Per-instance colours of the three zones of a tint mask, for an
+// instanced item whose instances are tinted apart. Only read when
+// `instanceTints` is set.
+layout(location = 5) in vec3 aInstTintA;
+layout(location = 6) in vec3 aInstTintB;
+layout(location = 7) in vec3 aInstTintC;
 
 uniform bool instanced;
 uniform mat4 model;
@@ -39,6 +45,10 @@ out vec3  AmbientLight;
 out vec3  WorldPos; // for the per-fragment point lights
 out vec3  WorldN;
 out float ViewDepth;  // view-space depth (-z), for the cluster slice
+// Flat: one instance, one set of colours, nothing to interpolate.
+flat out vec3 InstTintA;
+flat out vec3 InstTintB;
+flat out vec3 InstTintC;
 
 void main() {
   // Instanced draws build the world transform from the per-instance
@@ -83,4 +93,7 @@ void main() {
   WorldPos  = worldPos4.xyz;
   WorldN    = worldN;
   ViewDepth = -viewPos.z;
+  InstTintA = aInstTintA;
+  InstTintB = aInstTintB;
+  InstTintC = aInstTintC;
 }

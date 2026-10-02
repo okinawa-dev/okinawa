@@ -14,6 +14,12 @@
 static const int OK_INST_ATTR_POS    = 3;
 static const int OK_INST_ATTR_ORIENT = 4;
 static const int OK_INST_FLOATS      = 8;
+// The three zone colours an instance may carry, after those: one
+// attribute a zone, three floats each.
+static const int OK_INST_ATTR_TINT     = 5;
+static const int OK_INST_TINT_FLOATS   = 9;
+static const int OK_INST_LAYOUT_PLAIN  = 1;
+static const int OK_INST_LAYOUT_TINTED = 2;
 
 OkInstancedItem::OkInstancedItem(const std::string &name, float *vertexData,
                                  long vertexCount, unsigned int *indexData,
@@ -21,6 +27,8 @@ OkInstancedItem::OkInstancedItem(const std::string &name, float *vertexData,
     : OkItem(name, vertexData, vertexCount, indexData, indexCount,
              vertexStride) {
   _instanceVbo    = 0;
+  _tintedCount    = 0;
+  _bufferLayout   = 0;
   _drawnCount     = 0;
   _instanceCentre = {0.0f, 0.0f, 0.0f};
   _instanceRadius = 0.0f;
@@ -34,6 +42,8 @@ OkInstancedItem::OkInstancedItem(const std::string &name,
     : OkItem(name, meshKey, vertexData, vertexCount, indexData, indexCount,
              vertexStride) {
   _instanceVbo    = 0;
+  _tintedCount    = 0;
+  _bufferLayout   = 0;
   _drawnCount     = 0;
   _instanceCentre = {0.0f, 0.0f, 0.0f};
   _instanceRadius = 0.0f;
@@ -87,6 +97,11 @@ int OkInstancedItem::addInstance(float x, float y, float z, float yaw,
   inst.scale   = scale;
   inst.visible = true;
   _instances.push_back(inst);
+  if (!_instanceTinted.empty()) {
+    std::array<float, 9> none = {};
+    _instanceTints.push_back(none);
+    _instanceTinted.push_back(0);
+  }
   growInstanceBounds(inst);
   return static_cast<int>(_instances.size()) - 1;
 }
@@ -112,6 +127,50 @@ void OkInstancedItem::setInstanceVisible(int index, bool visible) {
 
 void OkInstancedItem::clearInstances() {
   _instances.clear();
+  _instanceTints.clear();
+  _instanceTinted.clear();
+  _tintedCount = 0;
+}
+
+void OkInstancedItem::setInstanceMaterialTint(int index, int slot, float r,
+                                              float g, float b) {
+  if (index < 0 || index >= static_cast<int>(_instances.size()) || slot < 0 ||
+      slot >= MAT_SLOTS) {
+    return;
+  }
+  size_t at = static_cast<size_t>(index);
+  if (_instanceTinted.empty()) {
+    std::array<float, 9> none = {};
+    _instanceTints.assign(_instances.size(), none);
+    _instanceTinted.assign(_instances.size(), 0);
+  }
+  if (_instanceTinted[at] == 0) {
+    // From the item's colours, so the zones not named keep theirs.
+    for (int k = 0; k < MAT_SLOTS; k++) {
+      for (int c = 0; c < RGB; c++) {
+        _instanceTints[at][(static_cast<size_t>(k) * RGB) +
+                           static_cast<size_t>(c)] =
+            material.slotTint[static_cast<size_t>(k)][static_cast<size_t>(c)];
+      }
+    }
+    _instanceTinted[at] = 1;
+    _tintedCount++;
+  }
+  size_t first                  = static_cast<size_t>(slot) * RGB;
+  _instanceTints[at][first]     = r;
+  _instanceTints[at][first + 1] = g;
+  _instanceTints[at][first + 2] = b;
+}
+
+void OkInstancedItem::clearInstanceMaterialTints(int index) {
+  if (index < 0 || index >= static_cast<int>(_instanceTinted.size())) {
+    return;
+  }
+  size_t at = static_cast<size_t>(index);
+  if (_instanceTinted[at] != 0) {
+    _instanceTinted[at] = 0;
+    _tintedCount--;
+  }
 }
 
 /**
@@ -119,29 +178,50 @@ void OkInstancedItem::clearInstances() {
  *        mesh VAO with an attribute divisor of 1 (advance once per
  *        instance instead of once per vertex).
  */
-void OkInstancedItem::ensureInstanceBuffer() {
-  if (_instanceVbo != 0) {
+void OkInstancedItem::ensureInstanceBuffer(bool tinted) {
+  int layout = tinted ? OK_INST_LAYOUT_TINTED : OK_INST_LAYOUT_PLAIN;
+  if (_instanceVbo != 0 && _bufferLayout == layout) {
     return;
   }
-  glGenBuffers(1, &_instanceVbo);
+  if (_instanceVbo == 0) {
+    glGenBuffers(1, &_instanceVbo);
+  }
+  int     floats = OK_INST_FLOATS + (tinted ? OK_INST_TINT_FLOATS : 0);
+  GLsizei stride = static_cast<GLsizei>(floats * sizeof(float));
   glBindVertexArray(VAO);
   glBindBuffer(GL_ARRAY_BUFFER, _instanceVbo);
 
   // vec4: world position + uniform scale
-  glVertexAttribPointer(OK_INST_ATTR_POS, 4, GL_FLOAT, GL_FALSE,
-                        OK_INST_FLOATS * sizeof(float), nullptr);
+  glVertexAttribPointer(OK_INST_ATTR_POS, 4, GL_FLOAT, GL_FALSE, stride,
+                        nullptr);
   glEnableVertexAttribArray(OK_INST_ATTR_POS);
   glVertexAttribDivisor(OK_INST_ATTR_POS, 1);
 
   // vec4: cos(yaw), sin(yaw), spare, spare
-  glVertexAttribPointer(OK_INST_ATTR_ORIENT, 4, GL_FLOAT, GL_FALSE,
-                        OK_INST_FLOATS * sizeof(float),
+  glVertexAttribPointer(OK_INST_ATTR_ORIENT, 4, GL_FLOAT, GL_FALSE, stride,
                         reinterpret_cast<GLvoid *>(4 * sizeof(float)));
   glEnableVertexAttribArray(OK_INST_ATTR_ORIENT);
   glVertexAttribDivisor(OK_INST_ATTR_ORIENT, 1);
 
+  // vec3 a zone: the colours of the tint mask's three zones.
+  for (int k = 0; k < MAT_SLOTS; k++) {
+    GLuint attr = static_cast<GLuint>(OK_INST_ATTR_TINT + k);
+    if (tinted) {
+      size_t offset = (static_cast<size_t>(OK_INST_FLOATS) +
+                       (static_cast<size_t>(k) * RGB)) *
+                      sizeof(float);
+      glVertexAttribPointer(attr, RGB, GL_FLOAT, GL_FALSE, stride,
+                            reinterpret_cast<GLvoid *>(offset));
+      glEnableVertexAttribArray(attr);
+      glVertexAttribDivisor(attr, 1);
+    } else {
+      glDisableVertexAttribArray(attr);
+    }
+  }
+
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
+  _bufferLayout = layout;
 }
 
 /**
@@ -172,8 +252,10 @@ void OkInstancedItem::drawSelf() {
   // lost every one of its windows to exactly that.
   glm::mat4        model   = getTransformMatrix();
   const OkFrustum *frustum = OkFrustum::getActive();
+  bool             tinted  = _tintedCount > 0;
+  int              floats = OK_INST_FLOATS + (tinted ? OK_INST_TINT_FLOATS : 0);
   _uploadScratch.clear();
-  _uploadScratch.reserve(_instances.size() * OK_INST_FLOATS);
+  _uploadScratch.reserve(_instances.size() * static_cast<size_t>(floats));
   for (size_t i = 0; i < _instances.size(); i++) {
     const Instance &inst = _instances[i];
     if (!inst.visible) {
@@ -201,13 +283,26 @@ void OkInstancedItem::drawSelf() {
     _uploadScratch.push_back(std::sin(inst.yaw));
     _uploadScratch.push_back(0.0f);
     _uploadScratch.push_back(0.0f);
+    if (tinted) {
+      // Its own colours, or the item's for one that has none.
+      for (int k = 0; k < MAT_SLOTS; k++) {
+        for (int c = 0; c < RGB; c++) {
+          size_t q = (static_cast<size_t>(k) * RGB) + static_cast<size_t>(c);
+          _uploadScratch.push_back(_instanceTinted[i] != 0
+                                       ? _instanceTints[i][q]
+                                       : material.slotTint[static_cast<size_t>(
+                                             k)][static_cast<size_t>(c)]);
+        }
+      }
+    }
   }
-  _drawnCount = static_cast<int>(_uploadScratch.size() / OK_INST_FLOATS);
+  _drawnCount =
+      static_cast<int>(_uploadScratch.size() / static_cast<size_t>(floats));
   if (_drawnCount == 0) {
     return;
   }
 
-  ensureInstanceBuffer();
+  ensureInstanceBuffer(tinted);
   glBindBuffer(GL_ARRAY_BUFFER, _instanceVbo);
   glBufferData(GL_ARRAY_BUFFER,
                static_cast<GLsizeiptr>(_uploadScratch.size() * sizeof(float)),
@@ -225,6 +320,10 @@ void OkInstancedItem::drawSelf() {
   GLint instLoc = glGetUniformLocation(currentProgram, "instanced");
   if (instLoc != -1) {
     glUniform1i(instLoc, 1);
+  }
+  GLint instTintLoc = glGetUniformLocation(currentProgram, "instanceTints");
+  if (instTintLoc != -1) {
+    glUniform1f(instTintLoc, tinted ? 1.0f : 0.0f);
   }
   bool drawTexture =
       OkConfig::getBool("graphics.textures") && texture && texture->isLoaded();
@@ -315,6 +414,9 @@ void OkInstancedItem::drawSelf() {
   }
   if (instLoc != -1) {
     glUniform1i(instLoc, 0);
+  }
+  if (instTintLoc != -1) {
+    glUniform1f(instTintLoc, 0.0f);
   }
   _endMaterial(static_cast<unsigned int>(currentProgram), material);
 }

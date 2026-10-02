@@ -82,6 +82,26 @@ public:
   // Hide/show one instance: hidden instances are not
   // drawn and cost nothing but their slot.
   void setInstanceVisible(int index, bool visible);
+  /**
+   * @brief The colour one instance gives a zone of the tint mask.
+   *
+   * Without it every instance wears the item's own three colours, and a
+   * variation between instances -- a lit pane among dark ones, a door of
+   * another colour -- had to be an item of its own. With it the
+   * variation is a colour per instance and the draw is still one.
+   *
+   * Only the colours vary: the mask, the texture, the blend mode and how
+   * each zone's tint is applied are the item's.
+   *
+   * @param slot 0, 1 or 2: the mask's red, green or blue zone.
+   */
+  void setInstanceMaterialTint(int index, int slot, float r, float g, float b);
+  /** @brief Put one instance back on the item's own colours. */
+  void clearInstanceMaterialTints(int index);
+  /** @brief Whether any instance carries colours of its own. */
+  bool hasInstanceTints() const {
+    return _tintedCount > 0;
+  }
   // Drop every instance.
   void clearInstances();
   int  getInstanceCount() const {
@@ -103,7 +123,19 @@ private:
     bool  visible;
   };
 
-  void ensureInstanceBuffer();
+  // Make the per-instance buffer and point the attributes at it, for the
+  // layout this draw uses: with the zone colours or without.
+  void ensureInstanceBuffer(bool tinted);
+
+  // The zone colours of the instances that have their own, nine floats
+  // each, and which those are. Both empty until the first is set: an
+  // item whose instances all look alike pays nothing for this.
+  std::vector<std::array<float, 9>> _instanceTints;
+  std::vector<char>                 _instanceTinted;
+  int                               _tintedCount;
+  // Which layout the attributes are pointed at: 0 none yet, 1 plain,
+  // 2 with colours.
+  int _bufferLayout;
 
   std::vector<Instance> _instances;
   // The sphere the instances cover, grown as they arrive: a parent asks
@@ -113,7 +145,7 @@ private:
 
   /** @brief Widen the instance sphere to take one more instance in. */
   void               growInstanceBounds(const Instance &inst);
-  std::vector<float> _uploadScratch;  // visible instances, 8 floats each
+  std::vector<float> _uploadScratch;  // visible instances, as uploaded
   GLuint             _instanceVbo;
   int                _drawnCount;
 };

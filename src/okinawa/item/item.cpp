@@ -324,6 +324,10 @@ void OkItem::addMaterialFromFile(long firstIndex, long indexCount,
   mr.count       = indexCount;
   mr.texture     = nullptr;
   mr.ownMaterial = false;
+  mr.centreKnown = false;
+  mr.centre[0]   = 0.0f;
+  mr.centre[1]   = 0.0f;
+  mr.centre[2]   = 0.0f;
   if (!path.empty()) {
     // Same contract as loadTextureFromFile: the slot holds its own
     // reference, so the texture outlives whatever else drops it.
@@ -664,6 +668,55 @@ void OkItem::clearRangeMaterial(size_t range) {
   materials[range].ownMaterial = false;
 }
 
+void OkItem::_sortRangesFarFirst(unsigned int program, const glm::mat4 &model,
+                                 std::vector<size_t> *order) {
+  // The view the pass is drawn with, read back from the program: the
+  // same question is asked from a frame, a preview and a shadow map, and
+  // only the program knows which eye is looking.
+  GLint                 viewLoc = glGetUniformLocation(program, "view");
+  std::array<float, 16> raw     = {};
+  if (viewLoc == -1) {
+    return;
+  }
+  glGetUniformfv(program, viewLoc, raw.data());
+  glm::mat4 toEye = glm::make_mat4(raw.data()) * model;
+
+  std::vector<std::pair<float, size_t>> byDepth;
+  for (size_t k = 0; k < order->size(); k++) {
+    MaterialRange &mr = materials[(*order)[k]];
+    if (!mr.centreKnown) {
+      // The middle of the range's vertices, once: a range is added and
+      // not changed.
+      std::array<double, 3> sum = {0.0, 0.0, 0.0};
+      for (long i = 0; i < mr.count; i++) {
+        const float *v = vertices + (static_cast<long>(indices[mr.first + i]) *
+                                     VERTEX_STRIDE);
+        sum[0] += v[0];
+        sum[1] += v[1];
+        sum[2] += v[2];
+      }
+      double n       = mr.count > 0 ? static_cast<double>(mr.count) : 1.0;
+      mr.centre[0]   = static_cast<float>(sum[0] / n);
+      mr.centre[1]   = static_cast<float>(sum[1] / n);
+      mr.centre[2]   = static_cast<float>(sum[2] / n);
+      mr.centreKnown = true;
+    }
+    glm::vec4 eye =
+        toEye * glm::vec4(mr.centre[0], mr.centre[1], mr.centre[2], 1.0f);
+    // In eye space the view looks down -z: the most negative is furthest.
+    byDepth.emplace_back(eye.z, (*order)[k]);
+  }
+  std::stable_sort(byDepth.begin(), byDepth.end(), _nearerLast);
+  for (size_t k = 0; k < byDepth.size(); k++) {
+    (*order)[k] = byDepth[k].second;
+  }
+}
+
+bool OkItem::_nearerLast(const std::pair<float, size_t> &a,
+                         const std::pair<float, size_t> &b) {
+  return a.first < b.first;
+}
+
 bool OkItem::drawsInPass(bool blendedPass) const {
   // Into a shadow map go the solid ranges, once.
   bool want = inShadowPass() ? false : blendedPass;
@@ -983,12 +1036,25 @@ void OkItem::drawSelf() {
     // scene comes back for them.
     bool   blendedPass = !g_shadowPass && inBlendedPass();
     size_t passes      = materials.empty() ? 1 : materials.size();
+    // Which ranges this pass draws, and in what order. Solid ones in the
+    // order they were added: the depth buffer sorts them. Blended ones
+    // furthest first, since they write no depth and each is mixed with
+    // what is already behind it -- a near pane drawn before a far one
+    // would be painted over by it.
+    std::vector<size_t> order;
     for (size_t mi = 0; mi < passes; mi++) {
-      const OkMaterial &mat = _materialOf(mi);
-      if (mat.isBlended() != blendedPass) {
-        continue;
+      if (_materialOf(mi).isBlended() == blendedPass) {
+        order.push_back(mi);
       }
-      drewAny = true;
+    }
+    if (blendedPass && order.size() > 1) {
+      _sortRangesFarFirst(static_cast<unsigned int>(current_program), model,
+                          &order);
+    }
+    for (size_t oi = 0; oi < order.size(); oi++) {
+      size_t            mi  = order[oi];
+      const OkMaterial &mat = _materialOf(mi);
+      drewAny               = true;
       _beginMaterial(static_cast<unsigned int>(current_program), mat);
       OkTexture *tex    = materials.empty() ? texture : materials[mi].texture;
       long       first  = materials.empty() ? 0 : materials[mi].first;
@@ -1042,6 +1108,12 @@ void OkItem::drawSelf() {
     if (colorLoc != -1) {
       glUniform4f(colorLoc, wireframeColor[0], wireframeColor[1],
                   wireframeColor[2], 1.0f);
+    }
+    // The lines in their own colour: the tint of the last range drawn is
+    // still in the program, and it multiplies whatever is drawn next.
+    GLint overlayTint = glGetUniformLocation(current_program, "tintColor");
+    if (overlayTint != -1) {
+      glUniform4f(overlayTint, 1.0f, 1.0f, 1.0f, 1.0f);
     }
 
     glDrawElements(drawMode, static_cast<GLsizei>(numIndices), GL_UNSIGNED_INT,

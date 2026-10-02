@@ -15,6 +15,9 @@ in vec3  AmbientLight;  // ambient floor, never shadowed
 in vec3  WorldPos;
 in vec3  WorldN;
 in float ViewDepth;
+flat in vec3 InstTintA;
+flat in vec3 InstTintB;
+flat in vec3 InstTintC;
 
 // Point lights (L4), evaluated per fragment: quadratic falloff inside
 // each light's radius, no shadows. Per-vertex would smear one lit
@@ -113,6 +116,9 @@ uniform vec4      matTintC;         // slot 2: the mask's blue weight
 // The second is what an emissive surface needs: the artwork supplies
 // the shading, the tint supplies the colour of the light.
 uniform vec3      matLuminance;
+// 1 when the draw is instanced and its instances carry their own zone
+// colours: those are used instead of the three above.
+uniform float     instanceTints;
 uniform vec3      sceneTint;   // global atmosphere tint (day cycle)
 uniform vec3      fogColor;    // exponential distance fog (day cycle)
 uniform float     fogDensity;  // 0 disables (the GUI pass resets it)
@@ -168,19 +174,21 @@ void main() {
         total = 1.0;
       }
       float grey  = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
-      vec3  zoneA = mix(texel.rgb, vec3(grey), matLuminance.x) *
-                    matTintA.rgb;
-      vec3  zoneB = mix(texel.rgb, vec3(grey), matLuminance.y) *
-                    matTintB.rgb;
-      vec3  zoneC = mix(texel.rgb, vec3(grey), matLuminance.z) *
-                    matTintC.rgb;
+      vec3  tintA = instanceTints > 0.5 ? InstTintA : matTintA.rgb;
+      vec3  tintB = instanceTints > 0.5 ? InstTintB : matTintB.rgb;
+      vec3  tintC = instanceTints > 0.5 ? InstTintC : matTintC.rgb;
+      vec3  zoneA = mix(texel.rgb, vec3(grey), matLuminance.x) * tintA;
+      vec3  zoneB = mix(texel.rgb, vec3(grey), matLuminance.y) * tintB;
+      vec3  zoneC = mix(texel.rgb, vec3(grey), matLuminance.z) * tintC;
       // Whatever the weights leave over keeps the drawing's colour.
       texel.rgb = texel.rgb * (1.0 - total) + zoneA * w.r + zoneB * w.g +
                   zoneC * w.b;
     }
     color = texel * tintColor;
   } else {
-    color = wireframeColor;
+    // The fill colour, tinted like a texture would be: an untextured
+    // surface takes its material's colour and opacity too.
+    color = wireframeColor * tintColor;
   }
 
   vec3 pointSum = vec3(0.0);

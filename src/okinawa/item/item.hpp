@@ -9,7 +9,9 @@
 #include "../math/ray.hpp"
 #include <algorithm>
 #include <array>
+#include <glm/mat4x4.hpp>
 #include <string>
+#include <utility>
 #include <vector>
 
 class OkItem : public OkObject {
@@ -124,6 +126,10 @@ protected:
     // own; otherwise it is drawn with the item's.
     OkMaterial material;
     bool       ownMaterial;
+    // The middle of the range, in the item's own coordinates: what the
+    // blended ranges of an item are ordered by. Worked out when asked.
+    std::array<float, RGB> centre;
+    bool                   centreKnown;
   };
   std::vector<MaterialRange> materials;
   OkTexture                 *texture;
@@ -140,6 +146,12 @@ protected:
   // range is drawn, and take back what has to be taken back after.
   static void _beginMaterial(unsigned int program, const OkMaterial &mat);
   static void _endMaterial(unsigned int program, const OkMaterial &mat);
+  // Put the blended ranges of this pass furthest first, as seen with the
+  // view the program holds.
+  void        _sortRangesFarFirst(unsigned int program, const glm::mat4 &model,
+                                  std::vector<size_t> *order);
+  static bool _nearerLast(const std::pair<float, size_t> &a,
+                          const std::pair<float, size_t> &b);
   // Take or give back a reference to a material's tint mask.
   void        _holdMask(OkMaterial *mat, const std::string &path) const;
   static void _releaseMask(OkMaterial *mat);

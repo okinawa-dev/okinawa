@@ -347,10 +347,12 @@ void OkItemGroup::stepSelf(float dt) {
  * @brief Render method called each frame.
  */
 void OkItemGroup::drawSelf() {
-  // Draw all items
+  // Each member, in the pass that is being drawn: asked before the loop,
+  // since every member drawn sets it again for itself.
+  bool blendedPass = inBlendedPass();
   for (size_t i = 0; i < items.size(); i++) {
     if (items[i].item) {
-      items[i].item->draw();
+      items[i].item->drawPass(blendedPass);
     }
   }
 }

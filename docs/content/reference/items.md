@@ -282,10 +282,16 @@ A material handed to `setRangeMaterial` is copied. Its tint mask is taken
 by name (`tintMaskName`): the item loads it and holds the reference, as
 it does for its own.
 
-What sorting there is among blended surfaces is by **root object**,
-furthest first. Two panes inside one item are drawn in the order their
-ranges were added, and a pane seen through another pane of the same
-object is not sorted against it.
+Blended surfaces are drawn **furthest first**, since each is mixed with
+what is already behind it. Between objects the order is by root object;
+inside one item, its blended ranges are ordered by the middle of each
+range as the pass's view sees it, so two panes of one object come out
+right from either side. Two ranges that cross each other have no right
+order, and are drawn by their middles like any others.
+
+**An untextured surface takes its material too.** With no texture the
+fill colour is multiplied by the tint, so a flat-coloured range can be
+tinted and seen through like a textured one.
 
 ### Assembling one from pieces
 
@@ -532,9 +538,22 @@ under 100 MB.
 An instanced item is an `OkItem`, and it draws with the same material
 state: the texture, the blend mode and opacity, the tint mask and the
 three material tints all apply. It is the item's one material: an
-instanced item has no ranges. Every instance wears the same ones -- an instance carries a
-position, a rotation about Y and a scale, and nothing else -- so a
-variation that has to differ between instances is a group of its own.
+instanced item has no ranges.
+
+**The colours of the tint mask's zones can differ per instance.**
+`setInstanceMaterialTint(index, slot, r, g, b)` gives one instance its
+own colour for a zone, and `clearInstanceMaterialTints(index)` puts it
+back on the item's. The zones an instance does not name keep the item's
+colours. Only the colours vary -- the mask, the texture, the blend mode
+and each zone's luminance mode stay the item's, so a variation of those
+is an item of its own -- and the draw is still one call: the colours
+travel with each instance's transform. An item none of whose instances
+is tinted uploads nothing extra.
+
+```cpp
+int lit = panes->addInstance(x, y, z, yaw);
+panes->setInstanceMaterialTint(lit, 1, 1.0f, 0.85f, 0.55f);
+```
 
 **An instance is placed within its item**, not in the world: the item's
 own transform applies on top, so an instanced item can hang off a parent
@@ -612,6 +631,10 @@ flipped for GL.
 | `int getItemCountWithTag(const std::string &tag)` | Count items with a tag. |
 | `void setVisible(bool)` | Show or hide every item. |
 | `void setWireframe(bool)` | Wireframe every item. |
+
+A group is walked in both passes of a frame and each member draws in the
+pass it belongs to, so a member seen through is drawn after every solid
+one, in the group and out of it.
 
 ## Example
 

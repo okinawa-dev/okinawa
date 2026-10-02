@@ -28,6 +28,21 @@ private:
 protected:
   void drawSelf() override;
   void stepSelf(float dt) override;
+
+public:
+  /**
+   * @brief A group is walked in both passes.
+   *
+   * It draws nothing of its own; its members each draw in the pass they
+   * belong to. Walked only in the solid pass, a member seen through was
+   * drawn among the solid ones and painted over by whichever came after.
+   */
+  bool drawsInPass(bool blendedPass) const override {
+    (void)blendedPass;
+    return true;
+  }
+
+protected:
   void updateTransformSelf() override;
 
 public:
