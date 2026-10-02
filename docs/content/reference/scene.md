@@ -41,19 +41,26 @@ scene->addObject(myItem);
 A frame is drawn in two passes. **Opaque geometry first, nearest to
 furthest** — the depth buffer then rejects what is hidden, which is the
 cheapest defence against overdraw in a scene full of occluders. **Blended
-geometry afterwards**: halos and glows deliberately do not write depth,
-so anything opaque drawn later would pass the depth test and paint over
-them.
+geometry afterwards, furthest to nearest**: what is seen through or adds
+light deliberately does not write depth, so anything opaque drawn later
+would pass the depth test and paint over it, and a surface seen through
+is mixed with what is already behind it, so the far one has to be down
+first.
 
-Which pass an object belongs to is its own answer, `isBlended()`, and it
-is asked **per object**. The scene walks the whole tree in each pass, and
-each object draws itself in one of them. That matters as soon as objects
+Which pass an object draws in is its own answer, `drawsInPass()`, and it
+is asked **per object**. The scene walks the whole tree in each pass.
+Most objects draw in one of them, the one `isBlended()` names; an item
+whose ranges of faces have [materials](items.md#materials-and-blend-modes)
+of both kinds draws in both, each time only the ranges that belong
+there, and `OkObject::inBlendedPass()` tells it which pass is asking. That matters as soon as objects
 have children: decided per root, a single glow inside a group would carry
 that group's walls and roofs into the late pass with it.
 
-The opaque order is refreshed every few frames rather than every frame —
-it only has to be roughly right, and sorting thousands of objects every
-frame costs more than it saves.
+The order is refreshed every few frames rather than every frame — it
+only has to be roughly right, and sorting thousands of objects every
+frame costs more than it saves. It is an order of **root objects**: the
+blended pass walks the same list backwards, so two blended surfaces
+under one root are not sorted against each other.
 
 ### Skipping a subtree
 

@@ -4,6 +4,7 @@
 #include "../core/gl_config.hpp"
 #include "../core/object.hpp"
 #include "../handlers/textures.hpp"
+#include "../item/material.hpp"
 #include "../item/texture.hpp"
 #include "../math/ray.hpp"
 #include <algorithm>
@@ -90,8 +91,6 @@ protected:
   long                   numIndices;
   float                  radius;  // bounding-sphere radius (half bbox diagonal)
   std::array<float, RGB> sphereCenter;  // bounding-sphere centre, local coords
-  bool                   additive;      // additive blending (light halos)
-  bool                   unlit;         // skip Gouraud light and the scene tint
   // How many point lights an item keeps track of. Beyond this the
   // nearest ones win and the rest are ignored for that item.
   static const int                 MAX_NEAR_LIGHTS = 8;
@@ -121,23 +120,29 @@ protected:
     long        count;    // how many indices
     OkTexture  *texture;  // null draws the range in the fill colour
     std::string textureName;
+    // How the range is drawn, when it has been given a material of its
+    // own; otherwise it is drawn with the item's.
+    OkMaterial material;
+    bool       ownMaterial;
   };
   std::vector<MaterialRange> materials;
   OkTexture                 *texture;
 
-  // Multiplies the texture in the fill pass.
-  std::array<float, RGBA> tintColor;
-  float                   fade;          // 1 = solid; below that, dithered away
-  bool                    fadeInverted;  // use the opposite half of the pattern
-  std::array<std::array<float, RGB>, MAT_SLOTS> matTint;
-  std::array<float, MAT_SLOTS>                  matLuma;
-  // The weights of the three material slots, one per channel of a
-  // second texture; null when the item has none. See setTintMask().
-  OkTexture  *tintMask;
-  std::string tintMaskName;  // path, for reference counting
-  // The texture's alpha is coverage and a pixel under one half is
-  // dropped. See setAlphaCutout().
-  bool alphaCutout;
+  // How the item is drawn: blending, lighting, tints, tint mask. Every
+  // range without a material of its own wears this one.
+  OkMaterial material;
+  float      fade;          // 1 = solid; below that, dithered away
+  bool       fadeInverted;  // use the opposite half of the pattern
+
+  // The material a range is drawn with: its own, or the item's.
+  const OkMaterial &_materialOf(size_t range) const;
+  // Put a material's state into the program and the pipeline before its
+  // range is drawn, and take back what has to be taken back after.
+  static void _beginMaterial(unsigned int program, const OkMaterial &mat);
+  static void _endMaterial(unsigned int program, const OkMaterial &mat);
+  // Take or give back a reference to a material's tint mask.
+  void        _holdMask(OkMaterial *mat, const std::string &path) const;
+  static void _releaseMask(OkMaterial *mat);
 
   // Geometry
   void _calculateRadius();
@@ -387,21 +392,87 @@ public:
     fillColor[2] = b;
     fillColor[3] = a;
   }
-  // Tint multiplied over the texture in the fill pass (white = untouched).
-  // Additive blending (glows/halos): drawn with src-alpha one blending
-  // and no depth writes. World pass only.
+  /**
+   * @brief How the item's pixels meet what is behind them.
+   *
+   * Opaque by default. The two blended modes are drawn after everything
+   * solid, do not write depth and cast no shadow. See OkBlendMode.
+   */
+  void setBlendMode(OkBlendMode mode) {
+    material.blend = mode;
+  }
+  OkBlendMode getBlendMode() const {
+    return material.blend;
+  }
+  /**
+   * @brief How much of the item shows, 0 to 1: the alpha of its tint.
+   *
+   * It counts in the blended modes (OK_BLEND_ALPHA, OK_BLEND_ADDITIVE);
+   * a solid item is solid whatever this says.
+   */
+  void setOpacity(float a) {
+    material.tint[3] = std::min(std::max(a, 0.0f), 1.0f);
+  }
+  float getOpacity() const {
+    return material.tint[3];
+  }
+  /**
+   * @brief Additive blending, as a switch: setBlendMode(OK_BLEND_ADDITIVE)
+   *        and back to opaque.
+   */
   void setAdditive(bool on) {
-    additive = on;
+    if (on) {
+      material.blend = OK_BLEND_ADDITIVE;
+    } else if (material.blend == OK_BLEND_ADDITIVE) {
+      material.blend = OK_BLEND_OPAQUE;
+    }
   }
+  /** @brief Whether the item as a whole belongs to the late pass. */
   bool isBlended() const override {
-    return additive;
+    return material.isBlended();
   }
+  /**
+   * @brief Yes to each pass some range of the item belongs to.
+   *
+   * An item whose ranges differ -- a solid frame, a pane seen through --
+   * is drawn in both, each time only the ranges of that pass. Into a
+   * shadow map go the solid ranges alone: what is seen through or adds
+   * light is not matter.
+   */
+  bool drawsInPass(bool blendedPass) const override;
   // Unlit: this item ignores the Gouraud sun/point lights and the scene
   // tint (light sources must not be tinted by the atmosphere). World
   // pass only -- the flag restores world-pass uniforms after drawing.
   void setUnlit(bool on) {
-    unlit = on;
+    material.unlit = on;
   }
+
+  /**
+   * @brief The item's material, to read.
+   *
+   * What every range without one of its own is drawn with. Changed
+   * through the item's setters, which is how the tint mask's reference
+   * stays counted.
+   */
+  const OkMaterial &getMaterial() const {
+    return material;
+  }
+  /**
+   * @brief Give one range of faces a material of its own.
+   *
+   * The range is one of those added with addMesh or addMaterialFromFile,
+   * in the order they were added. From then on it ignores the item's
+   * material and is drawn with this one: its own blend mode, opacity,
+   * tints and tint mask. The mask is named by `tintMaskName`; the item
+   * loads it and holds its reference.
+   *
+   * @return false when there is no such range.
+   */
+  bool setRangeMaterial(size_t range, const OkMaterial &mat);
+  /** @brief The material a range is drawn with; null when out of range. */
+  const OkMaterial *getRangeMaterial(size_t range) const;
+  /** @brief Put a range back on the item's material. */
+  void clearRangeMaterial(size_t range);
 
   /**
    * @brief Recolour zones of the texture by weight, read from a second
@@ -426,11 +497,11 @@ public:
   void setTintMask(const std::string &path);
   /** @brief Path of the tint mask, empty when the item has none. */
   const std::string &getTintMaskName() const {
-    return tintMaskName;
+    return material.tintMaskName;
   }
   /** @brief Whether a tint mask is loaded and will be drawn. */
   bool hasTintMask() const {
-    return tintMask != nullptr;
+    return material.tintMask != nullptr;
   }
   /**
    * @brief Read the texture's alpha as coverage, and drop what is not
@@ -442,11 +513,15 @@ public:
    * takes no part in whether a pixel is drawn.
    */
   void setAlphaCutout(bool on) {
-    alphaCutout = on;
+    if (on) {
+      material.blend = OK_BLEND_CUTOUT;
+    } else if (material.blend == OK_BLEND_CUTOUT) {
+      material.blend = OK_BLEND_OPAQUE;
+    }
   }
   /** @brief Whether the texture's alpha is read as a cutout. */
   bool getAlphaCutout() const {
-    return alphaCutout;
+    return material.blend == OK_BLEND_CUTOUT;
   }
   /**
    * @brief How a slot's tint is applied to its zone.
@@ -458,7 +533,7 @@ public:
    */
   void setMaterialLuminance(int slot, bool on) {
     if (slot >= 0 && slot <= 2) {
-      matLuma[slot] = on ? 1.0f : 0.0f;
+      material.slotLuminance[static_cast<size_t>(slot)] = on ? 1.0f : 0.0f;
     }
   }
   /** @brief Whether a slot's tint is applied in luminance mode. */
@@ -466,7 +541,7 @@ public:
     if (slot < 0 || slot > 2) {
       return false;
     }
-    return matLuma[slot] > 0.5f;
+    return material.slotLuminance[static_cast<size_t>(slot)] > 0.5f;
   }
   /**
    * @brief The colour a material slot's zone is tinted with.
@@ -478,16 +553,20 @@ public:
     if (slot < 0 || slot > 2) {
       return;
     }
-    matTint[slot][0] = r;
-    matTint[slot][1] = g;
-    matTint[slot][2] = b;
+    material.slotTint[static_cast<size_t>(slot)][0] = r;
+    material.slotTint[static_cast<size_t>(slot)][1] = g;
+    material.slotTint[static_cast<size_t>(slot)][2] = b;
   }
 
+  /**
+   * @brief The colour multiplied over the texture (white leaves it as it
+   *        is). Its alpha is the opacity: see setOpacity.
+   */
   void setTintColor(float r, float g, float b, float a) {
-    tintColor[0] = r;
-    tintColor[1] = g;
-    tintColor[2] = b;
-    tintColor[3] = a;
+    material.tint[0] = r;
+    material.tint[1] = g;
+    material.tint[2] = b;
+    material.tint[3] = a;
   }
   // Cross-fade for level-of-detail handovers: 1 draws the item whole,
   // 0 drops it entirely, and values between drop that share of its
@@ -522,7 +601,7 @@ public:
   // Update and render
   void stepSelf(float dt) override;
   /**
-   * @brief Send this item's material state to the program in use.
+   * @brief Send the item's own material state to the program in use.
    *
    * The mask flags, the tint mask and the three material tints.
    * Shared because an

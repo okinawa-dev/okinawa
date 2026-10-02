@@ -163,9 +163,7 @@ void OkScene::draw() {
                 return a.first < b.first;
               });
   }
-  // Opaque first, nearest to furthest; then the blended, in whatever
-  // order they were added -- they do not write depth, so ordering them
-  // among themselves buys nothing.
+  // Opaque first, nearest to furthest; then the blended.
   //
   // Both passes walk every root, and each object draws itself only in
   // its own pass. The two used to be sorted apart HERE, by asking each
@@ -175,8 +173,12 @@ void OkScene::draw() {
   for (size_t i = 0; i < _drawOrder.size(); ++i) {
     _drawOrder[i].second->drawPass(false);
   }
-  for (size_t i = 0; i < rootObjects.size(); ++i) {
-    rootObjects[i]->drawPass(true);
+  // The blended, furthest first: a surface seen through is mixed with
+  // what is already behind it, so the far one has to be down before the
+  // near one. By root, on the same order the solid pass uses backwards
+  // -- as rough as that order is, and for the same reason.
+  for (size_t i = _drawOrder.size(); i > 0; --i) {
+    _drawOrder[i - 1].second->drawPass(true);
   }
   // What the objects said about themselves, in one draw rather than in
   // one per object: fourteen thousand gizmos are fourteen thousand draw

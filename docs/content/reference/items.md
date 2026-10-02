@@ -62,11 +62,19 @@ parent working out how far its children reach) wants the centre.
 | `size_t getMaterialCount() const` | How many material slots the item has (0 = single-material). |
 | `void setTexture(const std::string &name, OkTexture *tex)` | Apply an already-loaded texture. The item takes its own reference (see below). |
 | `void setFillColor(float r, float g, float b, float a = 1)` | Untextured fill colour; the alpha is honoured by blended passes (the GUI). |
-| `void setTintColor(float r, float g, float b, float a)` | Multiplied over the texture in the fill pass (white = untouched); how GUI text is coloured. |
+| `void setTintColor(float r, float g, float b, float a)` | Multiplied over the texture in the fill pass (white = untouched); how GUI text is coloured. The alpha is the opacity. |
+| `void setBlendMode(OkBlendMode mode)` | How the item's pixels meet what is behind them: opaque, cutout, alpha or additive (see [Materials](#materials-and-blend-modes)). |
+| `void setOpacity(float a)` | How much of the item shows, 0 to 1. Counts in the two blended modes. |
+| `void setAdditive(bool on)` | `setBlendMode(OK_BLEND_ADDITIVE)`, as a switch. |
+| `void setUnlit(bool on)` | Skip the lights and the scene's tint: a light source, a debug line. |
+| `bool setRangeMaterial(size_t range, const OkMaterial &mat)` | Give one range of faces a material of its own (see [Materials](#materials-and-blend-modes)). |
+| `const OkMaterial *getRangeMaterial(size_t range) const` | The material a range is drawn with: its own, or the item's. |
+| `void clearRangeMaterial(size_t range)` | Put a range back on the item's material. |
+| `const OkMaterial &getMaterial() const` | The item's own material, to read. |
 | `void setTintMask(const std::string &path)` | A second texture whose red, green and blue are the weights of material slots 0, 1 and 2 (see below). Empty removes it. |
 | `void setMaterialTint(int slot, float r, float g, float b)` | The colour a slot's zone is tinted with. |
 | `void setMaterialLuminance(int slot, bool on)` | Whether a slot's tint multiplies the texture (off) or replaces its hue and keeps its luminance (on). |
-| `void setAlphaCutout(bool on)` | Read the texture's alpha as coverage and drop pixels under one half (see below). |
+| `void setAlphaCutout(bool on)` | `setBlendMode(OK_BLEND_CUTOUT)`, as a switch: read the texture's alpha as coverage and drop pixels under one half (see below). |
 | `void updateVertexData(float *data, long count)` | Replace the vertex data in place (stride-5 contract; normals recomputed against the item's indices). |
 | `float getRadius() const` | The mesh's maximum dimension. |
 | `bool intersectRay(const OkRay &ray, float *outDistance) const` | Whether a ray crosses this item's own triangles, and how far along (see below). |
@@ -194,9 +202,90 @@ Rules:
   the same terms as [texture ownership](#texture-ownership) below.
 - A slot with an empty path draws its range in the item's fill colour.
 - Everything that is *per item* — the transform, the frustum test, the
-  fade, the lighting uniforms — is done once for the whole mesh,
-  whatever the slot count. Only the texture bind and the draw call
-  repeat.
+  fade, the lights near it — is done once for the whole mesh, whatever
+  the slot count. Only the texture bind, the material's state and the
+  draw call repeat.
+- Every slot is drawn with the item's material unless it has been given
+  one of its own: see below.
+
+### Materials and blend modes
+
+Apart from its texture, a surface is drawn with a **material**
+(`OkMaterial`, in `okinawa/item/material.hpp`): how it blends with what
+is behind it, whether the lights model it, the colour and opacity it is
+tinted with, and its tint mask with the colours of its three zones.
+
+| Field | What it is |
+| --- | --- |
+| `OkBlendMode blend` | How its pixels meet what is behind them (below). Opaque by default. |
+| `bool unlit` | Skip the lights and the scene's tint. |
+| `std::array<float, 4> tint` | Multiplied over the texture; the alpha is the opacity. |
+| `slotTint`, `slotLuminance` | The colour each zone of the tint mask takes, and how it is applied. |
+| `tintMaskName` | The tint mask, by path. |
+
+An item has one material, set through its own methods (`setBlendMode`,
+`setOpacity`, `setTintColor`, `setUnlit`, `setTintMask`,
+`setMaterialTint`...). That is all a single-material item needs, and it
+is what every range of a many-material item wears by default.
+
+**How a material blends is one property with four answers**, because the
+four exclude each other:
+
+| Mode | What it does |
+| --- | --- |
+| `OK_BLEND_OPAQUE` | Solid. The texture's alpha takes no part in whether a pixel is drawn. |
+| `OK_BLEND_CUTOUT` | All or nothing: a pixel under half covered is not drawn, the rest are solid. No blending, no sorting. |
+| `OK_BLEND_ALPHA` | Seen through: mixed with what is behind it by the pixel's coverage times the material's opacity. Glass, water, an overlay. |
+| `OK_BLEND_ADDITIVE` | Adds light to what is behind it. A halo, a glow. |
+
+**In every mode a texture's alpha means one thing: coverage.** How much
+of the pixel the material covers. The mode says what is done with it,
+and nothing else is ever stored there -- a code written into an alpha
+channel does not survive filtering.
+
+The two blended modes are drawn **after everything solid**, do not write
+depth, and are left out of the shadow maps: what is seen through, or is
+light, is not matter. See [the scene's two passes](scene.md).
+
+```cpp
+// An overlay laid over the ground, two thirds there.
+overlay->setBlendMode(OK_BLEND_ALPHA);
+overlay->setOpacity(0.66f);
+```
+
+**A range of faces can have a material of its own**, which is what lets
+one object be made of things that are drawn differently: a window whose
+frame is solid and whose pane is seen through, a lamp whose post is lit
+and whose bulb is not.
+
+```cpp
+OkItem *window = new OkItem("window");
+window->addMesh(frame.data(), frameFloats, frameIdx.data(), frameCount,
+                "assets/frame.png");
+window->addMesh(pane.data(), paneFloats, paneIdx.data(), paneCount,
+                "assets/pane.png");
+window->upload();
+
+OkMaterial glass;
+glass.blend   = OK_BLEND_ALPHA;
+glass.tint[3] = 0.35f;            // opacity
+window->setRangeMaterial(1, glass);
+```
+
+Ranges count in the order they were added. From then on that range
+ignores the item's material. The item is drawn in **both** passes, each
+time only the ranges that belong there: the frame with the solid
+geometry, the pane with the blended. It is still one object -- one
+transform, one bounding sphere, one culling test.
+
+A material handed to `setRangeMaterial` is copied. Its tint mask is taken
+by name (`tintMaskName`): the item loads it and holds the reference, as
+it does for its own.
+
+What sorting there is among blended surfaces is by **root object**,
+furthest first. Two panes inside one item are drawn in the order their
+ranges were added, and a pane seen through another pane of the same
+object is not sorted against it.
 
 ### Assembling one from pieces
 
@@ -301,8 +390,9 @@ same filter, because halfway between a pixel that is all one zone and
 one that is all the next really is half of each, which is also the
 colour the eye expects there.
 
-**Alpha cutout.** With `setAlphaCutout(true)` the texture's alpha is
-coverage: a pixel whose filtered alpha is under one half is not drawn.
+**Alpha cutout.** With `setAlphaCutout(true)` -- the blend mode
+`OK_BLEND_CUTOUT` -- the texture's alpha is coverage taken as all or
+nothing: a pixel whose filtered alpha is under one half is not drawn.
 That is how a grille, a leaf or a railing is cut out of a quad without
 blending or sorting, and it is independent of the tint mask. Off, which
 is the default, the alpha decides nothing about which pixels are drawn.
@@ -440,8 +530,9 @@ under 100 MB.
 ## OkInstancedItem
 
 An instanced item is an `OkItem`, and it draws with the same material
-state: the texture, the tint mask, the alpha cutout and the three
-material tints all apply. Every instance wears the same ones -- an instance carries a
+state: the texture, the blend mode and opacity, the tint mask and the
+three material tints all apply. It is the item's one material: an
+instanced item has no ranges. Every instance wears the same ones -- an instance carries a
 position, a rotation about Y and a scale, and nothing else -- so a
 variation that has to differ between instances is a group of its own.
 

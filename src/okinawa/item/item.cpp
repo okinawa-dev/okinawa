@@ -42,10 +42,6 @@ void OkItem::_initDefaults() {
   fillColor[1]      = 1.0f;
   fillColor[2]      = 1.0f;
   fillColor[3]      = 1.0f;
-  tintColor[0]      = 1.0f;
-  tintColor[1]      = 1.0f;
-  tintColor[2]      = 1.0f;
-  tintColor[3]      = 1.0f;
   wireframeColor[0] = 1.0f;
   wireframeColor[1] = 1.0f;
   wireframeColor[2] = 1.0f;
@@ -55,21 +51,11 @@ void OkItem::_initDefaults() {
   sphereCenter[0] = 0.0f;
   sphereCenter[1] = 0.0f;
   sphereCenter[2] = 0.0f;
-  additive        = false;
-  unlit           = false;
-  tintMask        = nullptr;
-  tintMaskName    = "";
-  alphaCutout     = false;
+  material        = OkMaterial();
   fade            = 1.0f;
   fadeInverted    = false;
-  for (int i = 0; i < 3; i++) {
-    matTint[i][0] = 1.0f;
-    matTint[i][1] = 1.0f;
-    matTint[i][2] = 1.0f;
-    matLuma[i]    = 0.0f;
-  }
-  nearLightCount = 0;
-  nearLightGen   = -1;
+  nearLightCount  = 0;
+  nearLightGen    = -1;
 }
 
 OkItem::OkItem(const std::string &name) : OkObject(name) {
@@ -334,9 +320,10 @@ void OkItem::addMaterialFromFile(long firstIndex, long indexCount,
     return;
   }
   MaterialRange mr;
-  mr.first   = firstIndex;
-  mr.count   = indexCount;
-  mr.texture = nullptr;
+  mr.first       = firstIndex;
+  mr.count       = indexCount;
+  mr.texture     = nullptr;
+  mr.ownMaterial = false;
   if (!path.empty()) {
     // Same contract as loadTextureFromFile: the slot holds its own
     // reference, so the texture outlives whatever else drops it.
@@ -353,6 +340,7 @@ void OkItem::addMaterialFromFile(long firstIndex, long indexCount,
  */
 void OkItem::clearMaterials() {
   for (size_t i = 0; i < materials.size(); i++) {
+    _releaseMask(&materials[i].material);
     if (materials[i].texture && !materials[i].textureName.empty()) {
       OkTextureHandler::getInstance()->removeReference(
           materials[i].textureName);
@@ -482,10 +470,9 @@ OkItem::~OkItem() {
   if (texture && !textureName.empty()) {
     OkTextureHandler::getInstance()->removeReference(textureName);
   }
-  if (tintMask && !tintMaskName.empty()) {
-    OkTextureHandler::getInstance()->removeReference(tintMaskName);
-  }
+  _releaseMask(&material);
   for (size_t i = 0; i < materials.size(); i++) {
+    _releaseMask(&materials[i].material);
     if (materials[i].texture && !materials[i].textureName.empty()) {
       OkTextureHandler::getInstance()->removeReference(
           materials[i].textureName);
@@ -610,21 +597,88 @@ void OkItem::updateTransformSelf() {
  * shared by many items is loaded once and freed with the last of them.
  */
 void OkItem::setTintMask(const std::string &path) {
-  if (tintMask && !tintMaskName.empty()) {
-    OkTextureHandler::getInstance()->removeReference(tintMaskName);
+  _holdMask(&material, path);
+}
+
+void OkItem::_releaseMask(OkMaterial *mat) {
+  if (mat->tintMask != nullptr && !mat->tintMaskName.empty()) {
+    OkTextureHandler::getInstance()->removeReference(mat->tintMaskName);
   }
-  tintMask     = nullptr;
-  tintMaskName = "";
+  mat->tintMask     = nullptr;
+  mat->tintMaskName = "";
+}
+
+void OkItem::_holdMask(OkMaterial *mat, const std::string &path) const {
+  _releaseMask(mat);
   if (path.empty()) {
     return;
   }
-  tintMask = OkTextureHandler::getInstance()->createTextureFromFile(path);
-  if (tintMask) {
-    tintMaskName = path;
+  mat->tintMask = OkTextureHandler::getInstance()->createTextureFromFile(path);
+  if (mat->tintMask != nullptr) {
+    mat->tintMaskName = path;
   } else {
     OkLogger::error("Item",
                     "Could not load tint mask '" + path + "' for item " + name);
   }
+}
+
+const OkMaterial &OkItem::_materialOf(size_t range) const {
+  if (range < materials.size() && materials[range].ownMaterial) {
+    return materials[range].material;
+  }
+  return material;
+}
+
+bool OkItem::setRangeMaterial(size_t range, const OkMaterial &mat) {
+  if (range >= materials.size()) {
+    OkLogger::error("Item", "No material range " + std::to_string(range) +
+                                " in item: " + name);
+    return false;
+  }
+  MaterialRange &mr = materials[range];
+  // The mask is taken by name: the copy handed in holds no reference,
+  // and the pointer in it may be anybody's.
+  std::string mask = mat.tintMaskName;
+  _releaseMask(&mr.material);
+  mr.material              = mat;
+  mr.material.tintMask     = nullptr;
+  mr.material.tintMaskName = "";
+  _holdMask(&mr.material, mask);
+  mr.ownMaterial = true;
+  return true;
+}
+
+const OkMaterial *OkItem::getRangeMaterial(size_t range) const {
+  if (range >= materials.size()) {
+    return nullptr;
+  }
+  return &_materialOf(range);
+}
+
+void OkItem::clearRangeMaterial(size_t range) {
+  if (range >= materials.size()) {
+    return;
+  }
+  _releaseMask(&materials[range].material);
+  materials[range].material    = OkMaterial();
+  materials[range].ownMaterial = false;
+}
+
+bool OkItem::drawsInPass(bool blendedPass) const {
+  // Into a shadow map go the solid ranges, once.
+  bool want = inShadowPass() ? false : blendedPass;
+  if (inShadowPass() && blendedPass) {
+    return false;
+  }
+  if (materials.empty()) {
+    return material.isBlended() == want;
+  }
+  for (size_t i = 0; i < materials.size(); i++) {
+    if (_materialOf(i).isBlended() == want) {
+      return true;
+    }
+  }
+  return false;
 }
 
 namespace {
@@ -643,6 +697,9 @@ namespace {
     GLint                                maskSampler;
     std::array<GLint, OkItem::MAT_SLOTS> tints;
     GLint                                luminance;
+    GLint                                tint;
+    GLint                                lit;
+    GLint                                sceneTint;
   };
 
   const MaterialLocations &materialLocations(GLuint program) {
@@ -665,6 +722,9 @@ namespace {
           glGetUniformLocation(program, names[static_cast<size_t>(i)]);
     }
     cache.luminance = glGetUniformLocation(program, "matLuminance");
+    cache.tint      = glGetUniformLocation(program, "tintColor");
+    cache.lit       = glGetUniformLocation(program, "lightingOn");
+    cache.sceneTint = glGetUniformLocation(program, "sceneTint");
     filled          = true;
     return cache;
   }
@@ -672,37 +732,84 @@ namespace {
 }  // namespace
 
 void OkItem::applyMaterialUniforms(unsigned int program) const {
+  _beginMaterial(program, material);
+}
+
+void OkItem::_beginMaterial(unsigned int program, const OkMaterial &mat) {
   const MaterialLocations &loc =
       materialLocations(static_cast<GLuint>(program));
   // Every flag is written on every draw, set or not: they are program
   // state, and one left alone is whatever the item drawn before this
   // one happened to leave there.
   if (loc.cutout != -1) {
-    glUniform1f(loc.cutout, alphaCutout ? 1.0f : 0.0f);
+    glUniform1f(loc.cutout, mat.blend == OK_BLEND_CUTOUT ? 1.0f : 0.0f);
   }
-  bool useTintMask = tintMask != nullptr && tintMask->isLoaded();
+  if (loc.tint != -1) {
+    glUniform4f(loc.tint, mat.tint[0], mat.tint[1], mat.tint[2], mat.tint[3]);
+  }
+  bool useTintMask = mat.tintMask != nullptr && mat.tintMask->isLoaded();
   if (loc.hasMask != -1) {
     glUniform1f(loc.hasMask, useTintMask ? 1.0f : 0.0f);
   }
   if (useTintMask) {
     glActiveTexture(static_cast<GLenum>(GL_TEXTURE0 + TINT_MASK_UNIT));
-    tintMask->bind();
+    mat.tintMask->bind();
     glActiveTexture(GL_TEXTURE0);
     if (loc.maskSampler != -1) {
       glUniform1i(loc.maskSampler, TINT_MASK_UNIT);
     }
-  }
-  if (!useTintMask) {
-    return;
-  }
-  for (int i = 0; i < MAT_SLOTS; i++) {
-    GLint tintLoc = loc.tints[static_cast<size_t>(i)];
-    if (tintLoc != -1) {
-      glUniform4f(tintLoc, matTint[i][0], matTint[i][1], matTint[i][2], 1.0f);
+    for (int i = 0; i < MAT_SLOTS; i++) {
+      GLint tintLoc = loc.tints[static_cast<size_t>(i)];
+      if (tintLoc != -1) {
+        const std::array<float, 3> &t = mat.slotTint[static_cast<size_t>(i)];
+        glUniform4f(tintLoc, t[0], t[1], t[2], 1.0f);
+      }
+    }
+    if (loc.luminance != -1) {
+      glUniform3f(loc.luminance, mat.slotLuminance[0], mat.slotLuminance[1],
+                  mat.slotLuminance[2]);
     }
   }
-  if (loc.luminance != -1) {
-    glUniform3f(loc.luminance, matLuma[0], matLuma[1], matLuma[2]);
+  // Unlit materials (halos, emissive glows) skip the light and the
+  // atmosphere's tint for this draw; the world's values go back after.
+  if (mat.unlit) {
+    if (loc.lit != -1) {
+      glUniform1f(loc.lit, 0.0f);
+    }
+    if (loc.sceneTint != -1) {
+      glUniform3f(loc.sceneTint, 1.0f, 1.0f, 1.0f);
+    }
+  }
+  // The two blended modes mix with what is behind them and leave the
+  // depth buffer alone: a surface seen through must not hide what is
+  // drawn behind it later in the same pass. The solid modes touch no
+  // blending state at all -- an interface pass runs with blending on,
+  // and its items are solid ones.
+  if (mat.isBlended() && !inShadowPass()) {
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, mat.blend == OK_BLEND_ADDITIVE
+                                  ? GL_ONE
+                                  : GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
+  }
+}
+
+void OkItem::_endMaterial(unsigned int program, const OkMaterial &mat) {
+  const MaterialLocations &loc =
+      materialLocations(static_cast<GLuint>(program));
+  if (mat.isBlended() && !inShadowPass()) {
+    glDepthMask(GL_TRUE);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_BLEND);
+  }
+  if (mat.unlit) {
+    const float *wt = OkLighting::getSceneTint();
+    if (loc.lit != -1) {
+      glUniform1f(loc.lit, 1.0f);
+    }
+    if (loc.sceneTint != -1) {
+      glUniform3f(loc.sceneTint, wt[0], wt[1], wt[2]);
+    }
   }
 }
 
@@ -822,24 +929,6 @@ void OkItem::drawSelf() {
     }
   }
 
-  // Unlit items (halos, emissive glows) skip the Gouraud light and the
-  // atmosphere tint for this draw; world-pass values are restored after.
-  if (unlit) {
-    GLint litLoc  = glGetUniformLocation(current_program, "lightingOn");
-    GLint tintLoc = glGetUniformLocation(current_program, "sceneTint");
-    if (litLoc != -1) {
-      glUniform1f(litLoc, 0.0f);
-    }
-    if (tintLoc != -1) {
-      glUniform3f(tintLoc, 1.0f, 1.0f, 1.0f);
-    }
-  }
-  if (additive) {
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-    glDepthMask(GL_FALSE);
-  }
-
   // Verify we have valid buffers
   if (VAO == 0) {
     OkLogger::error("Item", "No VAO for item: " + name);
@@ -855,14 +944,10 @@ void OkItem::drawSelf() {
 
   // Fill pass: textured if we have a texture, otherwise a flat fill colour.
   // Always runs, so an item can show a flat fill and a wireframe overlay.
+  bool drewAny = false;
   {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     GLint hasTexLoc = glGetUniformLocation(current_program, "hasTexture");
-    GLint tintLoc   = glGetUniformLocation(current_program, "tintColor");
-    if (tintLoc != -1) {
-      glUniform4f(tintLoc, tintColor[0], tintColor[1], tintColor[2],
-                  tintColor[3]);
-    }
     // Uniform locations are fixed for the life of a program, so they are
     // looked up once per program rather than once per draw: with a few
     // thousand objects on screen, a name lookup per object per frame is
@@ -883,7 +968,6 @@ void OkItem::drawSelf() {
         glUniform1f(cachedInvert, fadeInverted ? 1.0f : 0.0f);
       }
     }
-    applyMaterialUniforms(static_cast<unsigned int>(current_program));
     GLint texLoc     = glGetUniformLocation(current_program, "texture0");
     GLint colorLoc   = glGetUniformLocation(current_program, "wireframeColor");
     bool  texturesOn = OkConfig::getBool("graphics.textures");
@@ -893,8 +977,19 @@ void OkItem::drawSelf() {
     // item, and only the texture changes between ranges. An item with
     // no slots draws its whole index buffer with its own texture, which
     // is the common case.
-    size_t passes = materials.empty() ? 1 : materials.size();
+    //
+    // Each range is drawn with its material, in the pass that material
+    // belongs to: the solid ones now, the ones seen through when the
+    // scene comes back for them.
+    bool   blendedPass = !g_shadowPass && inBlendedPass();
+    size_t passes      = materials.empty() ? 1 : materials.size();
     for (size_t mi = 0; mi < passes; mi++) {
+      const OkMaterial &mat = _materialOf(mi);
+      if (mat.isBlended() != blendedPass) {
+        continue;
+      }
+      drewAny = true;
+      _beginMaterial(static_cast<unsigned int>(current_program), mat);
       OkTexture *tex    = materials.empty() ? texture : materials[mi].texture;
       long       first  = materials.empty() ? 0 : materials[mi].first;
       long       count  = materials.empty() ? numIndices : materials[mi].count;
@@ -921,11 +1016,16 @@ void OkItem::drawSelf() {
                      reinterpret_cast<const void *>(
                          first * static_cast<long>(sizeof(unsigned int))));
       OkFrustum::addDraw(count / 3);
+      _endMaterial(static_cast<unsigned int>(current_program), mat);
     }
   }
 
   // Wireframe overlay pass (in the wireframe colour, on top of the fill).
   // Always unlit: the overlay is a drawing aid, not a surface.
+  // Once: with the solid ranges, or in the late pass for an item that
+  // has none. An item drawn in both would otherwise wear it twice.
+  drawWireframe =
+      drawWireframe && drewAny && (!inBlendedPass() || !drawsInPass(false));
   if (drawWireframe) {
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     GLint wLitLoc = glGetUniformLocation(current_program, "lightingOn");
@@ -953,7 +1053,7 @@ void OkItem::drawSelf() {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     GLint wLitLoc = glGetUniformLocation(current_program, "lightingOn");
     if (wLitLoc != -1) {
-      glUniform1f(wLitLoc, unlit ? 0.0f : 1.0f);
+      glUniform1f(wLitLoc, 1.0f);
     }
   }
 
@@ -963,24 +1063,6 @@ void OkItem::drawSelf() {
     // texture with
     // glBindTexture(GL_TEXTURE_2D, 0);
     OkTexture::unbind();
-  }
-
-  // Restore world-pass state after additive/unlit draws.
-  if (additive) {
-    glDepthMask(GL_TRUE);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_BLEND);
-  }
-  if (unlit) {
-    GLint        litLoc  = glGetUniformLocation(current_program, "lightingOn");
-    GLint        tintLoc = glGetUniformLocation(current_program, "sceneTint");
-    const float *wt      = OkLighting::getSceneTint();
-    if (litLoc != -1) {
-      glUniform1f(litLoc, 1.0f);
-    }
-    if (tintLoc != -1) {
-      glUniform3f(tintLoc, wt[0], wt[1], wt[2]);
-    }
   }
 }
 

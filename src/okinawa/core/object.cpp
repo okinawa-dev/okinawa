@@ -330,6 +330,18 @@ void OkObject::draw() {
   drawPass(true);
 }
 
+namespace {
+  // The pass being drawn, for an object that draws part of itself in
+  // each. Written just before every drawSelf, because a subtree drawn
+  // from inside one (a group drawing its members) runs both passes of
+  // its own and comes back.
+  bool g_blendedPass = false;
+}  // namespace
+
+bool OkObject::inBlendedPass() {
+  return g_blendedPass;
+}
+
 void OkObject::drawPass(bool blendedPass) {
   // The question comes first, and it covers the children too: a region
   // of the world that is not drawn costs one test, not one per item.
@@ -338,7 +350,8 @@ void OkObject::drawPass(bool blendedPass) {
   }
 
   // Each object draws itself in its own pass and stays out of the other.
-  if (isBlended() == blendedPass) {
+  if (drawsInPass(blendedPass)) {
+    g_blendedPass = blendedPass;
     drawSelf();
     drawDebugHelpers();
   }

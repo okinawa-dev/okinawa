@@ -255,6 +255,21 @@ public:
   virtual bool isBlended() const {
     return false;
   }
+
+  /**
+   * @brief Whether this object draws anything of its own in a pass.
+   *
+   * For most objects that is the one pass they belong to. An object
+   * whose parts differ -- a solid frame and a pane seen through --
+   * answers yes to both, and draws in each the parts that belong there
+   * (`inBlendedPass` tells it which).
+   */
+  virtual bool drawsInPass(bool blendedPass) const {
+    return isBlended() == blendedPass;
+  }
+
+  /** @brief Which pass is drawing, asked from inside `drawSelf`. */
+  static bool inBlendedPass();
 };
 
 #endif

@@ -226,31 +226,17 @@ void OkInstancedItem::drawSelf() {
   if (instLoc != -1) {
     glUniform1i(instLoc, 1);
   }
-  if (unlit) {
-    GLint litLoc  = glGetUniformLocation(currentProgram, "lightingOn");
-    GLint tintLoc = glGetUniformLocation(currentProgram, "sceneTint");
-    if (litLoc != -1) {
-      glUniform1f(litLoc, 0.0f);
-    }
-    if (tintLoc != -1) {
-      glUniform3f(tintLoc, 1.0f, 1.0f, 1.0f);
-    }
-  }
-
   bool drawTexture =
       OkConfig::getBool("graphics.textures") && texture && texture->isLoaded();
   GLint hasTexLoc = glGetUniformLocation(currentProgram, "hasTexture");
-  GLint tintLoc   = glGetUniformLocation(currentProgram, "tintColor");
   // The mask and the material tints, the same ones an ordinary draw
   // sends. Without them the instances came out wearing whatever the
   // last item drawn had left in those uniforms -- which looked almost
   // right, and made a hundred thousand windows take their glass colour
   // from whichever building happened to be drawn before them.
-  applyMaterialUniforms(static_cast<unsigned int>(currentProgram));
-  if (tintLoc != -1) {
-    glUniform4f(tintLoc, tintColor[0], tintColor[1], tintColor[2],
-                tintColor[3]);
-  }
+  // And the same blending and lighting: every instance wears the item's
+  // one material.
+  _beginMaterial(static_cast<unsigned int>(currentProgram), material);
   // The cross-fade uniform has to be written even when this item is not
   // fading. It is program state, not object state: leaving it alone
   // means inheriting whatever the last object drawn happened to set,
@@ -330,15 +316,5 @@ void OkInstancedItem::drawSelf() {
   if (instLoc != -1) {
     glUniform1i(instLoc, 0);
   }
-  if (unlit) {
-    GLint        litLoc = glGetUniformLocation(currentProgram, "lightingOn");
-    GLint        stLoc  = glGetUniformLocation(currentProgram, "sceneTint");
-    const float *wt     = OkLighting::getSceneTint();
-    if (litLoc != -1) {
-      glUniform1f(litLoc, 1.0f);
-    }
-    if (stLoc != -1) {
-      glUniform3f(stLoc, wt[0], wt[1], wt[2]);
-    }
-  }
+  _endMaterial(static_cast<unsigned int>(currentProgram), material);
 }
