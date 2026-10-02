@@ -6,6 +6,7 @@
 #include "../handlers/textures.hpp"
 #include "../lighting/lighting.hpp"
 #include "../math/frustum.hpp"
+#include "../shaders/shaders.hpp"
 #include "../utils/logger.hpp"
 #include "core/object.hpp"
 #include "item/texture.hpp"
@@ -577,6 +578,22 @@ bool OkItem::inShadowPass() {
   return g_shadowPass;
 }
 
+// The view of the pass being drawn, column-major; the identity until a
+// pass says otherwise.
+static std::array<float, 16> g_passView = {
+    1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+};
+void OkItem::setPassView(const float *viewMatrix) {
+  if (viewMatrix != nullptr) {
+    std::memcpy(g_passView.data(), viewMatrix,
+                sizeof(float) * g_passView.size());
+  }
+}
+const float *OkItem::getPassView() {
+  return g_passView.data();
+}
+
 void OkItem::stepSelf(float dt) {
   // Call parent class step function first
   // OkObject::step(dt);
@@ -668,18 +685,9 @@ void OkItem::clearRangeMaterial(size_t range) {
   materials[range].ownMaterial = false;
 }
 
-void OkItem::_sortRangesFarFirst(unsigned int program, const glm::mat4 &model,
+void OkItem::_sortRangesFarFirst(const glm::mat4     &model,
                                  std::vector<size_t> *order) {
-  // The view the pass is drawn with, read back from the program: the
-  // same question is asked from a frame, a preview and a shadow map, and
-  // only the program knows which eye is looking.
-  GLint                 viewLoc = glGetUniformLocation(program, "view");
-  std::array<float, 16> raw     = {};
-  if (viewLoc == -1) {
-    return;
-  }
-  glGetUniformfv(program, viewLoc, raw.data());
-  glm::mat4 toEye = glm::make_mat4(raw.data()) * model;
+  glm::mat4 toEye = glm::make_mat4(getPassView()) * model;
 
   std::vector<std::pair<float, size_t>> byDepth;
   for (size_t k = 0; k < order->size(); k++) {
@@ -757,10 +765,16 @@ namespace {
 
   const MaterialLocations &materialLocations(GLuint program) {
     static MaterialLocations cache;
-    static bool              filled = false;
-    if (filled && cache.program == program) {
+    static bool              filled     = false;
+    static unsigned long     generation = 0;
+    // By the program's name and by how many have been linked: a name is
+    // handed out again once its program is gone, and the locations kept
+    // under it are then another program's.
+    if (filled && cache.program == program &&
+        generation == OkShader::generation()) {
       return cache;
     }
+    generation = OkShader::generation();
     const std::array<const char *, OkItem::MAT_SLOTS> names = {
         "matTintA",
         "matTintB",
@@ -1006,13 +1020,18 @@ void OkItem::drawSelf() {
     // thousand objects on screen, a name lookup per object per frame is
     // a measurable slice of the frame on its own.
     {
-      static GLuint cachedProgram = 0;
-      static GLint  cachedFade    = -1;
-      static GLint  cachedInvert  = -1;
-      if (cachedProgram != current_program) {
-        cachedProgram = current_program;
-        cachedFade    = glGetUniformLocation(current_program, "itemFade");
-        cachedInvert  = glGetUniformLocation(current_program, "itemFadeInvert");
+      static GLuint        cachedProgram    = 0;
+      static unsigned long cachedGeneration = 0;
+      static GLint         cachedFade       = -1;
+      static GLint         cachedInvert     = -1;
+      // By the program's name and by how many have been linked: a name
+      // is handed out again once its program is gone.
+      if (cachedProgram != current_program ||
+          cachedGeneration != OkShader::generation()) {
+        cachedProgram    = current_program;
+        cachedGeneration = OkShader::generation();
+        cachedFade       = glGetUniformLocation(current_program, "itemFade");
+        cachedInvert = glGetUniformLocation(current_program, "itemFadeInvert");
       }
       if (cachedFade != -1) {
         glUniform1f(cachedFade, fade);
@@ -1048,8 +1067,7 @@ void OkItem::drawSelf() {
       }
     }
     if (blendedPass && order.size() > 1) {
-      _sortRangesFarFirst(static_cast<unsigned int>(current_program), model,
-                          &order);
+      _sortRangesFarFirst(model, &order);
     }
     for (size_t oi = 0; oi < order.size(); oi++) {
       size_t            mi  = order[oi];

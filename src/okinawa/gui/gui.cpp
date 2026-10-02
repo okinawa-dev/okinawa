@@ -412,6 +412,7 @@ void OkGui::draw() {
   if (viewLoc != -1) {
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
   }
+  OkItem::setPassView(glm::value_ptr(view));
   if (projLoc != -1) {
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
   }

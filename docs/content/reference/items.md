@@ -286,7 +286,9 @@ Blended surfaces are drawn **furthest first**, since each is mixed with
 what is already behind it. Between objects the order is by root object;
 inside one item, its blended ranges are ordered by the middle of each
 range as the pass's view sees it, so two panes of one object come out
-right from either side. Two ranges that cross each other have no right
+right from either side. A pass that sends its own view matrix to the
+program says so with `OkItem::setPassView(view)`; the engine's frame,
+interface and preview passes do. Two ranges that cross each other have no right
 order, and are drawn by their middles like any others.
 
 **An untextured surface takes its material too.** With no texture the

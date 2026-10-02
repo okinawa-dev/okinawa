@@ -148,8 +148,7 @@ protected:
   static void _endMaterial(unsigned int program, const OkMaterial &mat);
   // Put the blended ranges of this pass furthest first, as seen with the
   // view the program holds.
-  void        _sortRangesFarFirst(unsigned int program, const glm::mat4 &model,
-                                  std::vector<size_t> *order);
+  void _sortRangesFarFirst(const glm::mat4 &model, std::vector<size_t> *order);
   static bool _nearerLast(const std::pair<float, size_t> &a,
                           const std::pair<float, size_t> &b);
   // Take or give back a reference to a material's tint mask.
@@ -386,8 +385,20 @@ public:
   // Set by the shadow map around its own pass, so an item can tell
   // which pass is drawing it.
   static void setShadowPass(bool on);
-  static bool inShadowPass();
-  bool        getWireframeGlobal() const {
+  /**
+   * @brief Tell the items which view the pass about to be drawn uses.
+   *
+   * Whoever sends a view matrix to the program says so here too, with
+   * the same sixteen floats: a frame, an interface pass, a preview. It
+   * is what an item's ranges seen through are ordered by, furthest
+   * first. Kept beside the uniform rather than read back from it: asking
+   * the driver for a uniform it was just given is not answered alike
+   * everywhere, and an order that depends on the driver is no order.
+   */
+  static void         setPassView(const float *viewMatrix);
+  static const float *getPassView();
+  static bool         inShadowPass();
+  bool                getWireframeGlobal() const {
     return wireframeGlobal;
   }
   void setWireframeColor(float r, float g, float b) {

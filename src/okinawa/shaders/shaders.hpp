@@ -17,6 +17,17 @@ public:
   static GLuint createProgram(const std::string &vertexSource,
                               const std::string &fragmentSource);
 
+  /**
+   * @brief A number that changes every time a program is linked.
+   *
+   * For whoever keeps uniform locations by program: the driver hands the
+   * same name out again once a program is deleted or its context is
+   * gone, so a cache keyed by the name alone can hold another program's
+   * locations. Compare this as well, and look them up again when it has
+   * moved.
+   */
+  static unsigned long generation();
+
 private:
 };
 

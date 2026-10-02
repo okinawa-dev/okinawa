@@ -46,6 +46,9 @@ namespace {
 }  // namespace
 
 TEST_CASE("OkAsyncLoader runs both halves of a job", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   OkAsyncLoader::initialize(2);
 
   SECTION("Prepare runs, then finish") {
@@ -86,6 +89,9 @@ TEST_CASE("OkAsyncLoader runs both halves of a job", "[async]") {
 }
 
 TEST_CASE("OkAsyncLoader runs every job exactly once", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   OkAsyncLoader::initialize(4);
 
   const int        COUNT = 200;
@@ -117,6 +123,9 @@ TEST_CASE("OkAsyncLoader runs every job exactly once", "[async]") {
 }
 
 TEST_CASE("OkAsyncLoader finishes on the calling thread", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   OkAsyncLoader::initialize(3);
 
   // This is the service's core promise: whatever creates engine objects
@@ -151,6 +160,9 @@ TEST_CASE("OkAsyncLoader finishes on the calling thread", "[async]") {
 }
 
 TEST_CASE("OkAsyncLoader honours the drain budget", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   OkAsyncLoader::initialize(2);
 
   const int        COUNT = 40;
@@ -185,6 +197,9 @@ TEST_CASE("OkAsyncLoader honours the drain budget", "[async]") {
 }
 
 TEST_CASE("OkAsyncLoader counters track the queue", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   OkAsyncLoader::initialize(1);
 
   REQUIRE(OkAsyncLoader::getPendingCount() == 0);
@@ -207,6 +222,9 @@ TEST_CASE("OkAsyncLoader counters track the queue", "[async]") {
 }
 
 TEST_CASE("OkAsyncLoader without initialize runs jobs inline", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   // Callers should not have to care whether the service is up: a tool,
   // a test or an early startup path gets the same result, just blocking.
   std::atomic<int>  prepared(0);
@@ -231,6 +249,9 @@ TEST_CASE("OkAsyncLoader without initialize runs jobs inline", "[async]") {
 }
 
 TEST_CASE("OkAsyncLoader survives shutdown with work in flight", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   // The interesting case is not the tidy one: it is quitting while
   // threads are mid-job, which is what happens when a player closes the
   // window during a load.
@@ -253,6 +274,9 @@ TEST_CASE("OkAsyncLoader survives shutdown with work in flight", "[async]") {
 }
 
 TEST_CASE("OkAsyncLoader can be restarted", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   OkAsyncLoader::initialize(2);
   std::atomic<int> first(0);
   OkAsyncLoader::submit([&] { first++; }, [] {});
@@ -271,6 +295,9 @@ TEST_CASE("OkAsyncLoader can be restarted", "[async]") {
 }
 
 TEST_CASE("OkAsyncLoader tolerates a double initialize", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   OkAsyncLoader::initialize(2);
   OkAsyncLoader::initialize(8);  // ignored: already running
 
@@ -284,6 +311,9 @@ TEST_CASE("OkAsyncLoader tolerates a double initialize", "[async]") {
 }
 
 TEST_CASE("OkAsyncLoader handles jobs queued from a finish half", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   // Chaining is how a caller gets ordering out of a service that has
   // none: each step queues the next from its own main-thread half.
   OkAsyncLoader::initialize(2);
@@ -318,6 +348,9 @@ TEST_CASE("OkAsyncLoader handles jobs queued from a finish half", "[async]") {
 }
 
 TEST_CASE("OkAsyncLoader survives many small jobs", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   // Repetition is the only real defence against a race: a scheduling
   // window that opens once in a thousand tries needs a thousand tries.
   OkAsyncLoader::initialize(4);
@@ -344,6 +377,9 @@ TEST_CASE("OkAsyncLoader survives many small jobs", "[async]") {
 // bites -- one rewritten while it is read, one that vanished between
 // the listing and the open -- and that is ordinary, not fatal.
 TEST_CASE("OkAsyncLoader survives a job that throws", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   OkAsyncLoader::initialize(2);
 
   std::atomic<int>  finished(0);
@@ -392,6 +428,9 @@ TEST_CASE("OkAsyncLoader survives a job that throws", "[async]") {
 // async_loader.cpp goes missing, every test above still passes and the
 // process still dies on the way out.
 TEST_CASE("OkAsyncLoader left running does not abort the exit", "[async]") {
+  // Whatever an earlier case left: the cases run in a random order, and
+  // one of them leaves the loader running on purpose.
+  OkAsyncLoader::shutdown();
   OkAsyncLoader::initialize(2);
   std::atomic<int> finished(0);
   OkAsyncLoader::submit([] {}, [&] { finished++; });

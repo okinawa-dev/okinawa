@@ -6,6 +6,7 @@
 #include "../gui/input_notice.hpp"
 #include "../gui/stats.hpp"
 #include "../input/input.hpp"
+#include "../item/item.hpp"
 #include "../lighting/light_clusters.hpp"
 #include "../lighting/lighting.hpp"
 #include "../lighting/shadow_map.hpp"
@@ -607,6 +608,7 @@ void OkCore::loop(const OkCoreCallback &stepCallback,
         GLint projLocS = glGetUniformLocation(_shaderProgram, "projection");
         glUniformMatrix4fv(viewLocS, 1, GL_FALSE,
                            _cameras[_currentCamera]->getViewPtr());
+        OkItem::setPassView(_cameras[_currentCamera]->getViewPtr());
         glUniformMatrix4fv(projLocS, 1, GL_FALSE,
                            _cameras[_currentCamera]->getProjectionPtr());
         GLint tintLocS = glGetUniformLocation(_shaderProgram, "sceneTint");
@@ -704,6 +706,7 @@ void OkCore::loop(const OkCoreCallback &stepCallback,
       // Use the current camera for view and projection
       glUniformMatrix4fv(viewLoc, 1, GL_FALSE,
                          _cameras[_currentCamera]->getViewPtr());
+      OkItem::setPassView(_cameras[_currentCamera]->getViewPtr());
       glUniformMatrix4fv(projLoc, 1, GL_FALSE,
                          _cameras[_currentCamera]->getProjectionPtr());
 

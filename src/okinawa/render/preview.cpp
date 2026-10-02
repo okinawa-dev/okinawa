@@ -3,6 +3,7 @@
 #include "../core/core.hpp"
 #include "../core/gl_config.hpp"
 #include "../core/object.hpp"
+#include "../item/item.hpp"
 #include "../math/frustum.hpp"
 #include "render_target.hpp"
 
@@ -185,6 +186,11 @@ void OkPreview::render(OkRenderTarget &target, const float *viewMatrix,
   if (viewLoc != -1) {
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, viewMatrix);
   }
+  // Borrowed like everything else here: the frame's view goes back.
+  std::array<float, MATRIX_FLOATS> previousView = {};
+  std::memcpy(previousView.data(), OkItem::getPassView(),
+              sizeof(float) * MATRIX_FLOATS);
+  OkItem::setPassView(viewMatrix);
   if (projLoc != -1) {
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, projMatrix);
   }
@@ -214,6 +220,7 @@ void OkPreview::render(OkRenderTarget &target, const float *viewMatrix,
   target.unbind();
 
   OkFrustum::setActive(previousFrustum);
+  OkItem::setPassView(previousView.data());
   glUseProgram(static_cast<GLuint>(previousProgram));
   glDepthMask(previousDepthMask);
   if (previousDepthTest == GL_FALSE) {

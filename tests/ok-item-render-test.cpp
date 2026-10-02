@@ -1,3 +1,4 @@
+#include "okinawa/config/config.hpp"
 #include "okinawa/handlers/textures.hpp"
 #include "okinawa/item/group.hpp"
 #include "okinawa/item/instanced_item.hpp"
@@ -66,10 +67,16 @@ namespace {
       glDisable(GL_BLEND);
       glDisable(GL_CULL_FACE);
       glUseProgram(program);
+      // The engine's settings are one for the whole run, and another test
+      // may have left them changed: a wireframe overlay draws the quad's
+      // diagonal straight through the pixel read here.
+      OkConfig::setBool("graphics.wireframe", false);
+      OkConfig::setBool("graphics.textures", true);
       glm::mat4 view = glm::mat4(1.0f);
       glm::mat4 proj = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.1f, 10.0f);
       glUniformMatrix4fv(glGetUniformLocation(program, "view"), 1, GL_FALSE,
                          glm::value_ptr(view));
+      OkItem::setPassView(glm::value_ptr(view));
       glUniformMatrix4fv(glGetUniformLocation(program, "projection"), 1,
                          GL_FALSE, glm::value_ptr(proj));
       // No light, no air: the colour out is the colour in.
@@ -164,6 +171,7 @@ TEST_CASE("A surface seen through is mixed with the solid one behind it",
   Stage::draw({pane, wall});
   std::array<float, 4> px = Stage::pixel(MID, MID);
   stage.end();
+  CAPTURE(px[0], px[1], px[2]);
 
   REQUIRE(close(px[0], 0.5f));
   REQUIRE(close(px[1], 0.0f));
@@ -201,6 +209,7 @@ TEST_CASE("One item draws its solid range and its range seen through",
   Stage::draw({&window});
   std::array<float, 4> px = Stage::pixel(MID, MID);
   stage.end();
+  CAPTURE(px[0], px[1], px[2]);
 
   // Green glass, half there, over the red frame.
   REQUIRE(close(px[0], 0.5f));
@@ -237,6 +246,7 @@ TEST_CASE("Ranges seen through are drawn furthest first", "[item][render]") {
   Stage::draw({&panes});
   std::array<float, 4> px = Stage::pixel(MID, MID);
   stage.end();
+  CAPTURE(px[0], px[1], px[2]);
 
   // Far green over black is (0, .5, 0); near red over that is
   // (.5, .25, 0). The other order gives (.25, .5, 0).
@@ -262,6 +272,7 @@ TEST_CASE("A group draws each member in its own pass", "[item][render]") {
   Stage::draw({&group});
   std::array<float, 4> px = Stage::pixel(MID, MID);
   stage.end();
+  CAPTURE(px[0], px[1], px[2]);
 
   REQUIRE(close(px[0], 0.5f));
   REQUIRE(close(px[1], 0.0f));

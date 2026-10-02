@@ -43,6 +43,13 @@ GLuint OkShader::compile(const std::string &source, GLenum shaderType,
   return shader;
 }
 
+// Counts the programs linked; see generation().
+static unsigned long g_programGeneration = 0;
+
+unsigned long OkShader::generation() {
+  return g_programGeneration;
+}
+
 GLuint OkShader::createProgram(const std::string &vertexSource,
                                const std::string &fragmentSource) {
   // Compile shaders
@@ -63,6 +70,7 @@ GLuint OkShader::createProgram(const std::string &vertexSource,
   glAttachShader(program, vertexShader);
   glAttachShader(program, fragmentShader);
   glLinkProgram(program);
+  g_programGeneration++;
 
   // Check linking errors
   GLint success;
